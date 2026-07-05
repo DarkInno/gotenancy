@@ -1,0 +1,93 @@
+package feature
+
+import (
+	"context"
+	"errors"
+	"testing"
+)
+
+func TestMemoryStoreResolveAndList(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+
+	if err := store.SetPlanDefaults(ctx, "starter", []Flag{
+		{Key: "members", Enabled: true, Config: map[string]string{"limit": "5"}},
+		{Key: "exports", Enabled: false},
+	}); err != nil {
+		t.Fatalf("SetPlanDefaults() error = %v", err)
+	}
+	if err := store.SetTenantOverrides(ctx, "tenant-a", []Flag{
+		{Key: "exports", Enabled: true, Config: map[string]string{"format": "csv"}},
+	}); err != nil {
+		t.Fatalf("SetTenantOverrides() error = %v", err)
+	}
+
+	flag, err := store.Resolve(ctx, "tenant-a", "starter", "exports")
+	if err != nil {
+		t.Fatalf("Resolve(exports) error = %v", err)
+	}
+	if !flag.Enabled || flag.Config["format"] != "csv" {
+		t.Fatalf("Resolve(exports) = %+v, want tenant override enabled", flag)
+	}
+
+	flag, err = store.Resolve(ctx, "tenant-a", "starter", "members")
+	if err != nil {
+		t.Fatalf("Resolve(members) error = %v", err)
+	}
+	if !flag.Enabled || flag.Config["limit"] != "5" {
+		t.Fatalf("Resolve(members) = %+v, want plan default", flag)
+	}
+
+	flags, err := store.List(ctx, "tenant-a", "starter")
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(flags) != 2 || flags[0].Key != "exports" || flags[1].Key != "members" {
+		t.Fatalf("List() = %+v, want exports then members", flags)
+	}
+}
+
+func TestMemoryStoreCopiesFlags(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+	flags := []Flag{{Key: "members", Enabled: true, Config: map[string]string{"limit": "5"}}}
+	if err := store.SetPlanDefaults(ctx, "starter", flags); err != nil {
+		t.Fatalf("SetPlanDefaults() error = %v", err)
+	}
+	flags[0].Config["limit"] = "999"
+
+	flag, err := store.Resolve(ctx, "tenant-a", "starter", "members")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+	if flag.Config["limit"] != "5" {
+		t.Fatalf("stored config = %q, want 5", flag.Config["limit"])
+	}
+
+	flag.Config["limit"] = "1"
+	again, err := store.Resolve(ctx, "tenant-a", "starter", "members")
+	if err != nil {
+		t.Fatalf("Resolve() again error = %v", err)
+	}
+	if again.Config["limit"] != "5" {
+		t.Fatalf("returned config mutated store, got %q", again.Config["limit"])
+	}
+}
+
+func TestMemoryStoreValidationAndMissing(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryStore()
+
+	if err := store.SetPlanDefaults(ctx, "", nil); !errors.Is(err, ErrInvalidFeature) {
+		t.Fatalf("SetPlanDefaults(empty plan) error = %v, want ErrInvalidFeature", err)
+	}
+	if err := store.SetPlanDefaults(ctx, "starter", []Flag{{}}); !errors.Is(err, ErrInvalidFeature) {
+		t.Fatalf("SetPlanDefaults(empty key) error = %v, want ErrInvalidFeature", err)
+	}
+	if err := store.SetTenantOverrides(ctx, "", nil); !errors.Is(err, ErrInvalidFeature) {
+		t.Fatalf("SetTenantOverrides(empty tenant) error = %v, want ErrInvalidFeature", err)
+	}
+	if _, err := store.Resolve(ctx, "tenant-a", "starter", "missing"); !errors.Is(err, ErrFeatureNotFound) {
+		t.Fatalf("Resolve(missing) error = %v, want ErrFeatureNotFound", err)
+	}
+}

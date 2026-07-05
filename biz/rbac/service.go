@@ -1,0 +1,14 @@
+package rbac
+
+import (
+	"context"
+
+	"gotenancy/core/types"
+)
+
+type Service interface {
+	CreateRole(ctx context.Context, role Role) error
+	GetRole(ctx context.Context, tenantID types.TenantID, key string) (Role, error)
+	DeleteRole(ctx context.Context, tenantID types.TenantID, key string) error
+	Authorize(ctx context.Context, tenantID types.TenantID, roles []string, permission Permission) error
+}

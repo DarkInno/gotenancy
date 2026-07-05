@@ -1,0 +1,20 @@
+# Build artifacts
+/bin/
+/dist/
+*.test
+*.out
+
+# Coverage
+coverage.out
+coverage.html
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

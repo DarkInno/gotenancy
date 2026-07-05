@@ -1,0 +1,11 @@
+package plan
+
+import "context"
+
+// Service manages SaaS plans.
+type Service interface {
+	Create(ctx context.Context, plan Plan) error
+	Get(ctx context.Context, id string) (Plan, error)
+	Update(ctx context.Context, plan Plan) error
+	Delete(ctx context.Context, id string) error
+}

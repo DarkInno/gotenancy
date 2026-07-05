@@ -1,0 +1,35 @@
+package store
+
+import "errors"
+
+var (
+	// ErrTenantNotFound reports that a tenant does not exist in the store.
+	ErrTenantNotFound = errors.New("gotenancy/store: tenant not found")
+
+	// ErrTenantAlreadyExists reports that a tenant already exists in the store.
+	ErrTenantAlreadyExists = errors.New("gotenancy/store: tenant already exists")
+
+	// ErrInvalidTenant reports that tenant metadata is not valid for persistence.
+	ErrInvalidTenant = errors.New("gotenancy/store: invalid tenant")
+
+	// ErrInvalidListFilter reports an invalid tenant list filter.
+	ErrInvalidListFilter = errors.New("gotenancy/store: invalid list filter")
+
+	// ErrNilStore reports that a store dependency is nil.
+	ErrNilStore = errors.New("gotenancy/store: nil store")
+
+	// ErrNilCache reports that a cache dependency is nil.
+	ErrNilCache = errors.New("gotenancy/store: nil cache")
+
+	// ErrNilDB reports that a SQL store was created with a nil database handle.
+	ErrNilDB = errors.New("gotenancy/store: nil db")
+
+	// ErrInvalidTableName reports an unsafe SQL table name.
+	ErrInvalidTableName = errors.New("gotenancy/store: invalid table name")
+
+	// ErrUnsupportedSQLDialect reports an unsupported SQLStore dialect.
+	ErrUnsupportedSQLDialect = errors.New("gotenancy/store: unsupported sql dialect")
+
+	// ErrInvalidCacheSize reports an invalid bounded memory cache size.
+	ErrInvalidCacheSize = errors.New("gotenancy/store: invalid cache size")
+)

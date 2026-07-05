@@ -1,0 +1,136 @@
+package store
+
+import (
+	"context"
+	"errors"
+	"sort"
+	"sync"
+
+	"gotenancy/core/types"
+)
+
+var _ Store = (*MemoryStore)(nil)
+
+// MemoryStore is a thread-safe in-memory tenant metadata store.
+type MemoryStore struct {
+	mu      sync.RWMutex
+	tenants map[types.TenantID]types.Tenant
+}
+
+// NewMemoryStore creates an empty memory store.
+func NewMemoryStore() *MemoryStore {
+	return &MemoryStore{
+		tenants: make(map[types.TenantID]types.Tenant),
+	}
+}
+
+// Get returns tenant metadata by ID.
+func (store *MemoryStore) Get(ctx context.Context, id types.TenantID) (types.Tenant, error) {
+	if err := ctx.Err(); err != nil {
+		return types.Tenant{}, err
+	}
+	if id == "" {
+		return types.Tenant{}, ErrInvalidTenant
+	}
+
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	tenant, ok := store.tenants[id]
+	if !ok {
+		return types.Tenant{}, ErrTenantNotFound
+	}
+	return cloneTenant(tenant), nil
+}
+
+// List returns tenants matching filter.
+func (store *MemoryStore) List(ctx context.Context, filter ListFilter) ([]types.Tenant, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := filter.validate(); err != nil {
+		return nil, err
+	}
+
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	tenants := make([]types.Tenant, 0, len(store.tenants))
+	for _, tenant := range store.tenants {
+		if filter.matches(tenant) {
+			tenants = append(tenants, cloneTenant(tenant))
+		}
+	}
+
+	sort.Slice(tenants, func(i, j int) bool {
+		return tenants[i].ID < tenants[j].ID
+	})
+	return pageTenants(tenants, filter), nil
+}
+
+// Create inserts tenant metadata.
+func (store *MemoryStore) Create(ctx context.Context, tenant types.Tenant) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := validateTenant(tenant); err != nil {
+		return err
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	if _, ok := store.tenants[tenant.ID]; ok {
+		return ErrTenantAlreadyExists
+	}
+	store.tenants[tenant.ID] = cloneTenant(tenant)
+	return nil
+}
+
+// Update replaces existing tenant metadata.
+func (store *MemoryStore) Update(ctx context.Context, tenant types.Tenant) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := validateTenant(tenant); err != nil {
+		return err
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	if _, ok := store.tenants[tenant.ID]; !ok {
+		return ErrTenantNotFound
+	}
+	store.tenants[tenant.ID] = cloneTenant(tenant)
+	return nil
+}
+
+// Delete removes tenant metadata by ID.
+func (store *MemoryStore) Delete(ctx context.Context, id types.TenantID) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if id == "" {
+		return ErrInvalidTenant
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	if _, ok := store.tenants[id]; !ok {
+		return ErrTenantNotFound
+	}
+	delete(store.tenants, id)
+	return nil
+}
+
+func validateTenant(tenant types.Tenant) error {
+	if tenant.ID == "" {
+		return ErrInvalidTenant
+	}
+	if tenant.Status == "" {
+		return errors.Join(ErrInvalidTenant, errors.New("tenant status is required"))
+	}
+	return nil
+}

@@ -1,0 +1,13 @@
+package migration
+
+import "gotenancy/core/types"
+
+// Migrator defines tenant-schema migration planning operations.
+type Migrator interface {
+	AddTenantColumn(table string, tenantField string, fieldType string) (string, error)
+	CreateSoftDeleteUniqueIndex(table string, indexName string, tenantField string, businessFields []string, softDeleteField string) (string, error)
+	CreateHardDeleteUniqueIndex(table string, indexName string, tenantField string, businessFields []string) (string, error)
+	SeedTenants(table string, tenants []types.Tenant) ([]Statement, error)
+}
+
+var _ Migrator = Planner{}

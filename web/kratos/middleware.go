@@ -1,0 +1,107 @@
+package kratosgotenancy
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"net/url"
+
+	tenantctx "gotenancy/core/context"
+	"gotenancy/core/resolver"
+	"gotenancy/core/store"
+	"gotenancy/core/types"
+
+	kerrors "github.com/go-kratos/kratos/v2/errors"
+	"github.com/go-kratos/kratos/v2/middleware"
+	"github.com/go-kratos/kratos/v2/transport"
+	khttp "github.com/go-kratos/kratos/v2/transport/http"
+)
+
+const (
+	reasonTenantRequired  = "TENANT_REQUIRED"
+	reasonTenantForbidden = "TENANT_FORBIDDEN"
+	reasonTenantInactive  = "TENANT_INACTIVE"
+	reasonHostRequired    = "HOST_REQUIRED"
+)
+
+// TenantMiddleware resolves the current tenant and stores it in context.
+func TenantMiddleware(resolver resolver.Resolver, store store.Store) middleware.Middleware {
+	return func(next middleware.Handler) middleware.Handler {
+		return func(ctx context.Context, req any) (any, error) {
+			request, err := requestFromContext(ctx)
+			if err != nil {
+				return nil, kerrors.Unauthorized(reasonTenantRequired, "tenant required")
+			}
+
+			tenantID, err := resolver.Resolve(request)
+			if err != nil {
+				return nil, kerrors.Unauthorized(reasonTenantRequired, "tenant required")
+			}
+
+			tenant, err := store.Get(ctx, tenantID)
+			if err != nil {
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return nil, kerrors.New(http.StatusRequestTimeout, reasonTenantForbidden, "tenant lookup timed out")
+				}
+				return nil, kerrors.Forbidden(reasonTenantForbidden, "tenant forbidden")
+			}
+			if tenant.Status != types.TenantStatusActive {
+				return nil, kerrors.Forbidden(reasonTenantInactive, "tenant inactive")
+			}
+
+			return next(tenantctx.WithTenant(ctx, tenant), req)
+		}
+	}
+}
+
+// TenantStatusGuard allows only active tenants.
+func TenantStatusGuard() middleware.Middleware {
+	return func(next middleware.Handler) middleware.Handler {
+		return func(ctx context.Context, req any) (any, error) {
+			tenant, ok := tenantctx.FromContext(ctx)
+			if !ok {
+				return nil, kerrors.Unauthorized(reasonTenantRequired, "tenant required")
+			}
+			if tenant.Status != types.TenantStatusActive {
+				return nil, kerrors.Forbidden(reasonTenantInactive, "tenant inactive")
+			}
+			return next(ctx, req)
+		}
+	}
+}
+
+// HostGuard allows only explicit host context.
+func HostGuard() middleware.Middleware {
+	return func(next middleware.Handler) middleware.Handler {
+		return func(ctx context.Context, req any) (any, error) {
+			if !tenantctx.IsHost(ctx) {
+				return nil, kerrors.Forbidden(reasonHostRequired, "host required")
+			}
+			return next(ctx, req)
+		}
+	}
+}
+
+func requestFromContext(ctx context.Context) (*http.Request, error) {
+	if request, ok := khttp.RequestFromServerContext(ctx); ok {
+		return request, nil
+	}
+
+	tr, ok := transport.FromServerContext(ctx)
+	if !ok || tr.RequestHeader() == nil {
+		return nil, resolver.ErrNilRequest
+	}
+
+	header := make(http.Header)
+	for _, key := range tr.RequestHeader().Keys() {
+		for _, value := range tr.RequestHeader().Values(key) {
+			header.Add(key, value)
+		}
+	}
+
+	return &http.Request{
+		Header: header,
+		Host:   header.Get("Host"),
+		URL:    &url.URL{},
+	}, nil
+}

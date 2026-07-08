@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 var _ Service = (*MemoryService)(nil)

@@ -3,7 +3,7 @@ package data
 import (
 	"errors"
 
-	"gotenancy"
+	"github.com/DarkInno/gotenancy"
 )
 
 var (

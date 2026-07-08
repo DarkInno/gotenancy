@@ -3,7 +3,7 @@ package feature
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // Store persists plan defaults and tenant overrides.

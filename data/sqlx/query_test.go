@@ -6,9 +6,9 @@ import (
 	"errors"
 	"testing"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/types"
-	"gotenancy/data"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/data"
 )
 
 func TestQueryAddsTenantFilter(t *testing.T) {

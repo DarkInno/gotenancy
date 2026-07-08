@@ -3,7 +3,7 @@ package tenantctx
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 type state struct {

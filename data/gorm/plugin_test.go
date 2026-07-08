@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"gotenancy"
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/types"
-	"gotenancy/data"
+	"github.com/DarkInno/gotenancy"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/data"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

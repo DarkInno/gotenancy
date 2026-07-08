@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 var _ Cache = (*MemoryCache)(nil)

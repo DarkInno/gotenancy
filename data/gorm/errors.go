@@ -3,7 +3,7 @@ package gormtenant
 import (
 	"errors"
 
-	"gotenancy"
+	"github.com/DarkInno/gotenancy"
 
 	"gorm.io/gorm"
 )

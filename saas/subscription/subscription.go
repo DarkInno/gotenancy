@@ -3,7 +3,7 @@ package subscription
 import (
 	"time"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // Subscription binds a tenant to a plan.

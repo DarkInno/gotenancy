@@ -1,6 +1,6 @@
 package tenant
 
-import "gotenancy/core/types"
+import "github.com/DarkInno/gotenancy/core/types"
 
 var (
 	activateTransitions = map[types.TenantStatus]types.TenantStatus{

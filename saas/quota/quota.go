@@ -1,6 +1,6 @@
 package quota
 
-import "gotenancy/core/types"
+import "github.com/DarkInno/gotenancy/core/types"
 
 // Limit describes a tenant resource limit.
 type Limit struct {

@@ -3,7 +3,7 @@ package tenant
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // Suspend transitions an Active tenant to Suspended.

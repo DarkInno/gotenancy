@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 func TestMemoryStoreCopiesTenantConfig(t *testing.T) {

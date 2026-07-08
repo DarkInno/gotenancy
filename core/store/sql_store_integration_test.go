@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"gotenancy/core/store"
-	"gotenancy/internal/testcontract"
+	"github.com/DarkInno/gotenancy/core/store"
+	"github.com/DarkInno/gotenancy/internal/testcontract"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"

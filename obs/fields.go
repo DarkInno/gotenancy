@@ -3,7 +3,7 @@ package obs
 import (
 	"context"
 
-	tenantctx "gotenancy/core/context"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
 )
 
 const (

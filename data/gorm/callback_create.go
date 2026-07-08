@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"

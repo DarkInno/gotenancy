@@ -3,7 +3,7 @@ package tenant
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // SoftDelete transitions an Active or Suspended tenant to SoftDeleted.

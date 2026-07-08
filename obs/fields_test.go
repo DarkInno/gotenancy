@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/types"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 func TestFields(t *testing.T) {

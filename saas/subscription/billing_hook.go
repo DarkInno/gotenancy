@@ -3,7 +3,7 @@ package subscription
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // BillingEvent describes a subscription change for external billing systems.

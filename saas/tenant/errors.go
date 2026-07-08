@@ -1,6 +1,6 @@
 package tenant
 
-import "gotenancy"
+import "github.com/DarkInno/gotenancy"
 
 var (
 	// ErrInvalidState reports an invalid tenant lifecycle transition.

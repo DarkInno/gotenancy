@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/types"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 func TestTenantCacheScopesKeys(t *testing.T) {

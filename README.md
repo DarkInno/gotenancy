@@ -22,12 +22,9 @@ Independent database and hybrid isolation models are not implemented.
 
 ## Install
 
-Until the repository path is chosen, use the local module name:
-
 ```bash
 go mod init your-app
-go mod edit -replace gotenancy=../gotenancy
-go get gotenancy
+go get github.com/DarkInno/gotenancy
 ```
 
 ## Quick Start

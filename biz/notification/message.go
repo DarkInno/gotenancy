@@ -1,6 +1,6 @@
 package notification
 
-import "gotenancy/core/types"
+import "github.com/DarkInno/gotenancy/core/types"
 
 type Message struct {
 	TenantID types.TenantID

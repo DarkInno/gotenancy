@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net/http"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/resolver"
-	"gotenancy/core/store"
-	"gotenancy/core/types"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/resolver"
+	"github.com/DarkInno/gotenancy/core/store"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // TenantMiddleware resolves the current tenant and stores it in request context.

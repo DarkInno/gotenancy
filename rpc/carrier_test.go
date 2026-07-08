@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/types"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 func TestInjectAndExtractTenant(t *testing.T) {

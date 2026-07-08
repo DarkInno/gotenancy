@@ -3,7 +3,7 @@ package tenant
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // Activate transitions a Pending tenant to Active.

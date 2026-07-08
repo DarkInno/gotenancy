@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"gotenancy/core/store"
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/store"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // StoreFactory creates an empty Store implementation for contract tests.

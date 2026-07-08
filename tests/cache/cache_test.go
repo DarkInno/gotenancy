@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"gotenancy/cache"
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/cache"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 func TestCacheIsolationAcrossTenants(t *testing.T) {

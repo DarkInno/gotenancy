@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 const (

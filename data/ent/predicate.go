@@ -5,8 +5,8 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 
-	"gotenancy/core/types"
-	"gotenancy/data"
+	"github.com/DarkInno/gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/data"
 )
 
 // SelectorPredicate is an Ent custom predicate that mutates a SQL selector.

@@ -3,8 +3,8 @@ package gormtenant
 import (
 	"context"
 
-	"gotenancy"
-	tenantctx "gotenancy/core/context"
+	"github.com/DarkInno/gotenancy"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
 
 	"gorm.io/gorm"
 )

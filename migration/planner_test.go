@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 func TestAddTenantColumn(t *testing.T) {

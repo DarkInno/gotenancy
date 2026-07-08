@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 var _ Store = (*CachedStore)(nil)

@@ -3,7 +3,7 @@ package quota
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // Service checks and consumes tenant quotas.

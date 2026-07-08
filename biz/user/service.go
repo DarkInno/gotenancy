@@ -3,7 +3,7 @@ package user
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 type Service interface {

@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"net/url"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/resolver"
-	"gotenancy/core/store"
-	"gotenancy/core/types"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/resolver"
+	"github.com/DarkInno/gotenancy/core/store"
+	"github.com/DarkInno/gotenancy/core/types"
 
 	kerrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/middleware"

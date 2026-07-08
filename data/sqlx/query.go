@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"gotenancy/data"
+	"github.com/DarkInno/gotenancy/data"
 )
 
 // Query adds the tenant filter to a base SQL statement.

@@ -3,7 +3,7 @@ package tenant
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 // Restore transitions a Suspended tenant to Active.

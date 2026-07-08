@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/types"
-	"gotenancy/data"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/data"
 
 	_ "github.com/go-sql-driver/mysql"
 	"gorm.io/driver/mysql"

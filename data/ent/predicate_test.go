@@ -11,10 +11,10 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 
-	"gotenancy"
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/types"
-	"gotenancy/data"
+	"github.com/DarkInno/gotenancy"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/data"
 )
 
 func TestPredicateAddsTenantFilter(t *testing.T) {

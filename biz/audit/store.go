@@ -3,7 +3,7 @@ package audit
 import (
 	"context"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 type Store interface {

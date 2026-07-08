@@ -1,6 +1,6 @@
 package migration
 
-import "gotenancy/core/types"
+import "github.com/DarkInno/gotenancy/core/types"
 
 // Migrator defines tenant-schema migration planning operations.
 type Migrator interface {

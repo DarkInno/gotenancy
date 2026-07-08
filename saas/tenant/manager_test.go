@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/store"
-	"gotenancy/core/types"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/store"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 func TestCreateTenant(t *testing.T) {

@@ -1,6 +1,6 @@
 package store
 
-import "gotenancy/core/types"
+import "github.com/DarkInno/gotenancy/core/types"
 
 func cloneTenant(tenant types.Tenant) types.Tenant {
 	if tenant.Config == nil {

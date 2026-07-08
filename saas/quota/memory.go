@@ -5,7 +5,7 @@ import (
 	"math"
 	"sync"
 
-	"gotenancy/core/types"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 var _ Store = (*MemoryStore)(nil)

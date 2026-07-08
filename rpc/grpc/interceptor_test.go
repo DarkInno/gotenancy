@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/store"
-	"gotenancy/core/types"
-	baserpc "gotenancy/rpc"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/store"
+	"github.com/DarkInno/gotenancy/core/types"
+	baserpc "github.com/DarkInno/gotenancy/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

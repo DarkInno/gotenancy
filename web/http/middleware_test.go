@@ -6,10 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	tenantctx "gotenancy/core/context"
-	"gotenancy/core/resolver"
-	"gotenancy/core/store"
-	"gotenancy/core/types"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
+	"github.com/DarkInno/gotenancy/core/resolver"
+	"github.com/DarkInno/gotenancy/core/store"
+	"github.com/DarkInno/gotenancy/core/types"
 )
 
 func TestTenantMiddlewareRejectsInactiveTenantByDefault(t *testing.T) {

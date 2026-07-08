@@ -1,6 +1,6 @@
 package user
 
-import "gotenancy/core/types"
+import "github.com/DarkInno/gotenancy/core/types"
 
 // User is an account that may belong to many tenants.
 type User struct {

@@ -3,7 +3,7 @@ package cache
 import (
 	"errors"
 
-	"gotenancy"
+	"github.com/DarkInno/gotenancy"
 )
 
 var (

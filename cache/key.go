@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	tenantctx "gotenancy/core/context"
+	tenantctx "github.com/DarkInno/gotenancy/core/context"
 )
 
 const (

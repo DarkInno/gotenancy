@@ -3,7 +3,7 @@ package gormtenant
 import (
 	"fmt"
 
-	"gotenancy/data"
+	"github.com/DarkInno/gotenancy/data"
 )
 
 const (

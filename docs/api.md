@@ -50,6 +50,7 @@ Public package overview.
 
 | Package | Purpose |
 |---|---|
+| `biz/identity` | External Auth/SSO identity links for verified Google, GitHub, Microsoft, Magic Link, SAML, or generic OIDC assertions. |
 | `biz/user` | Users and tenant members. |
 | `biz/rbac` | Tenant-scoped roles and permission checks. |
 | `biz/audit` | Tenant-scoped audit event store. |

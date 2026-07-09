@@ -26,6 +26,14 @@
 - HTTP, Gin, Echo, Fiber, Kratos, and gRPC tenant middleware reject non-active tenants by default.
 - Active-status guards are also available for trusted contexts created outside middleware.
 
+## External Auth And SSO
+
+- `biz/identity` accepts only already verified provider assertions; OAuth/OIDC token validation, magic-link verification, and SAML XML validation stay in the application or IdP SDK layer.
+- Identity providers must be explicitly allow-listed before an assertion is accepted.
+- Email verification is required by default. Disable it only when the upstream IdP assertion is otherwise trusted, such as a controlled SAML connection.
+- External subjects are linked by tenant, provider, and subject to prevent cross-tenant identity reuse from bypassing membership checks.
+- Generated user IDs are stable opaque hashes of provider and subject, avoiding raw provider subject leakage in normal user IDs.
+
 ## Cache Isolation
 
 - Tenant cache keys are prefixed as `t:{tenant_id}:`.

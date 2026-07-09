@@ -14,7 +14,7 @@ It provides tenant context, tenant resolution, data guards, web/RPC middleware, 
 - Host-wide access only through explicit host context.
 - GORM, Ent, and sqlx adapters for tenant-aware data access.
 - HTTP, Gin, Echo, Fiber, Kratos, and gRPC middleware.
-- Tenant lifecycle, plans, subscriptions, quotas, features, RBAC, audit, users, and notifications.
+- Tenant lifecycle, plans, subscriptions, quotas, features, external identity links, RBAC, audit, users, and notifications.
 
 Independent database and hybrid isolation models are not implemented.
 Future optional extension capabilities can live in separate modules, but the core adoption adapters ship with the main module.
@@ -181,12 +181,37 @@ ctx := tenantctx.WithHost(context.Background())
 - `saas/quota`: quota checking and atomic consumption.
 - `saas/feature`: plan defaults plus tenant-level feature overrides.
 - `saas/onboarding`: tenant onboarding flow across tenant, plan, subscription, feature, quota, audit, and notification services.
+- `biz/identity`: external Auth/SSO identity links for verified Google, GitHub, Microsoft, Magic Link, SAML, or generic OIDC assertions.
 - `web/*`: tenant middleware and guards for net/http, Gin, Echo, Fiber, and Kratos.
 - `rpc/grpc`: gRPC unary and stream tenant interceptors.
 - `migration`: tenant column and index planning.
 - `cache`: tenant-scoped cache wrapper and memory adapters.
 - `obs`: observability fields and redaction.
-- `biz/*`: user, RBAC, audit, and notification modules.
+- `biz/*`: identity, user, RBAC, audit, and notification modules.
+
+## External Auth And SSO
+
+GoTenancy does not implement password login, OAuth callbacks, token issuance, or SAML XML validation. Use an IdP or protocol library such as Stytch, Auth0, WorkOS, go-oidc, or a SAML toolkit to verify the login first, then map the verified identity into a tenant:
+
+```go
+users := user.NewMemoryService()
+identityService := identity.NewService(
+	users,
+	identity.WithProviders(identity.GoogleOIDC(), identity.GitHubOAuth(), identity.MicrosoftEntraID("organizations")),
+	identity.WithDefaultRoles("member"),
+)
+
+session, err := identityService.Authenticate(ctx, identity.Assertion{
+	TenantID:      "tenant-a",
+	Provider:      identity.ProviderGoogle,
+	Subject:       "google-subject",
+	Email:         "user@example.com",
+	Name:          "User Example",
+	EmailVerified: true,
+})
+```
+
+Provider presets include Google OIDC, GitHub OAuth, Microsoft Entra ID OIDC, generic OIDC, generic Magic Link, and generic SAML metadata. Providers must be explicitly allow-listed before assertions are accepted.
 
 ## Verification
 
@@ -221,7 +246,7 @@ migration/     Tenant schema migration planning
 cache/         Tenant-aware cache abstractions
 rpc/           RPC metadata propagation
 obs/           Observability fields and redaction
-biz/           User, RBAC, audit, and notification modules
+biz/           Identity, user, RBAC, audit, and notification modules
 examples/      Runnable examples
 tests/         Security, cache, concurrency, and local-only DB integration tests
 docs/          API, security, and compatibility notes

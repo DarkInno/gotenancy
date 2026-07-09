@@ -2,7 +2,7 @@
 // the post-auth identity mapping package.
 //
 // It handles provider metadata, authorization URLs, code exchange, ID-token
-// verification, nonce checking, and assertion construction. It does not issue
-// application sessions or store state; applications must persist and compare
-// the returned state, nonce, and PKCE verifier in their own session layer.
+// verification, nonce checking, optional one-time login state storage, and
+// assertion construction. It does not issue application sessions, cookies, or
+// account-management screens.
 package oidc

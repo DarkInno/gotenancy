@@ -29,9 +29,11 @@
 ## Identity And OIDC
 
 - `biz/identity` accepts only already verified provider assertions.
-- `biz/identity/oidc` handles standard OIDC authorization-code callbacks, token exchange, ID-token verification, nonce checks, and PKCE verifier use. Application sessions, Magic Link delivery, SAML XML validation, MFA, and WebAuthn stay outside this package.
-- Applications must persist and validate callback state by passing the expected `State`, `Nonce`, and `PKCEVerifier` back into the OIDC callback API.
+- `biz/identity/oidc` handles standard OIDC authorization-code callbacks, token exchange, ID-token verification, nonce checks, PKCE verifier use, form-post callback parsing, and optional one-time login state storage. Application sessions, Magic Link delivery, SAML XML validation, MFA, and WebAuthn stay outside this package.
+- Applications can pass the expected `State`, `Nonce`, and `PKCEVerifier` directly, or use `LoginStore` / `MemoryLoginStore` to consume pending login state exactly once.
+- `MemoryLoginStore` is bounded and TTL-based, but it is process-local; horizontally scaled applications should implement `LoginStore` with their secure session or shared cache layer.
 - ID tokens are verified against provider keys, issuer, audience, expiry, nonce, and `at_hash` when present.
+- Provider endpoints and redirect URLs must use HTTPS unless they are loopback HTTP URLs for local development.
 - Identity providers must be explicitly allow-listed before an assertion is accepted.
 - OIDC issuer validation is strict; avoid multi-tenant issuer shortcuts such as Microsoft `common` unless the application owns the issuer policy explicitly.
 - Email verification is required by default. Disable it only when the upstream IdP assertion is otherwise trusted, such as a controlled SAML connection.

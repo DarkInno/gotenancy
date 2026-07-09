@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -24,6 +25,7 @@ type Config struct {
 	RedirectURL   string
 	Scopes        []string
 	FetchUserInfo bool
+	HTTPClient    *http.Client
 }
 
 type Client struct {
@@ -32,6 +34,7 @@ type Client struct {
 	verifier      *oidclib.IDTokenVerifier
 	oidcProvider  *oidclib.Provider
 	fetchUserInfo bool
+	httpClient    *http.Client
 }
 
 type AuthRequest struct {
@@ -77,7 +80,11 @@ func New(ctx context.Context, config Config) (*Client, error) {
 	if provider.Kind != identity.ProviderKindOIDC || provider.Issuer == "" || config.ClientID == "" || config.RedirectURL == "" {
 		return nil, ErrInvalidConfig
 	}
+	if err := validateURLs(provider, config.RedirectURL); err != nil {
+		return nil, err
+	}
 
+	ctx = clientContext(ctx, config.HTTPClient)
 	oidcProvider, err := newProvider(ctx, provider)
 	if err != nil {
 		return nil, err
@@ -103,6 +110,7 @@ func New(ctx context.Context, config Config) (*Client, error) {
 		verifier:      oidcProvider.VerifierContext(ctx, &oidclib.Config{ClientID: config.ClientID}),
 		oidcProvider:  oidcProvider,
 		fetchUserInfo: config.FetchUserInfo,
+		httpClient:    config.HTTPClient,
 	}, nil
 }
 
@@ -140,8 +148,12 @@ func (client *Client) HandleCallback(ctx context.Context, request *http.Request,
 	if request == nil {
 		return Result{}, ErrInvalidCallback
 	}
+	values, err := callbackValuesFromRequest(request)
+	if err != nil {
+		return Result{}, err
+	}
 	return client.Callback(ctx, Callback{
-		Values:        request.URL.Query(),
+		Values:        values,
 		ExpectedState: expected.State,
 		ExpectedNonce: expected.Nonce,
 		PKCEVerifier:  expected.PKCEVerifier,
@@ -154,18 +166,27 @@ func (client *Client) Callback(ctx context.Context, callback Callback) (Result, 
 	if client == nil || callback.Values == nil || callback.ExpectedState == "" || callback.ExpectedNonce == "" || callback.PKCEVerifier == "" || callback.TenantID == "" {
 		return Result{}, ErrInvalidCallback
 	}
-	if callback.Values.Get("error") != "" {
-		return Result{}, fmt.Errorf("%w: %s", ErrProviderRejected, callback.Values.Get("error"))
+	providerError, err := optionalCallbackValue(callback.Values, "error")
+	if err != nil {
+		return Result{}, err
 	}
-	if !constantTimeEqual(callback.ExpectedState, callback.Values.Get("state")) {
+	if providerError != "" {
+		return Result{}, fmt.Errorf("%w: %s", ErrProviderRejected, providerError)
+	}
+	state, err := requiredCallbackValue(callback.Values, "state")
+	if err != nil {
+		return Result{}, err
+	}
+	if !constantTimeEqual(callback.ExpectedState, state) {
 		return Result{}, ErrStateMismatch
 	}
 
-	code := callback.Values.Get("code")
-	if code == "" {
-		return Result{}, ErrInvalidCallback
+	code, err := requiredCallbackValue(callback.Values, "code")
+	if err != nil {
+		return Result{}, err
 	}
 
+	ctx = client.context(ctx)
 	token, err := client.oauth2.Exchange(ctx, code, oauth2.VerifierOption(callback.PKCEVerifier))
 	if err != nil {
 		return Result{}, err
@@ -256,6 +277,7 @@ func tokenClaims(idToken *oidclib.IDToken) (claims, error) {
 }
 
 func (client *Client) userInfoClaims(ctx context.Context, token *oauth2.Token) (claims, error) {
+	ctx = client.context(ctx)
 	userInfo, err := client.oidcProvider.UserInfo(ctx, oauth2.StaticTokenSource(token))
 	if err != nil {
 		return claims{}, err
@@ -349,4 +371,116 @@ func cloneStrings(values []string) []string {
 	cloned := make([]string, len(values))
 	copy(cloned, values)
 	return cloned
+}
+
+func (client *Client) context(ctx context.Context) context.Context {
+	if client == nil {
+		return ctx
+	}
+	return clientContext(ctx, client.httpClient)
+}
+
+func clientContext(ctx context.Context, httpClient *http.Client) context.Context {
+	if httpClient == nil {
+		return ctx
+	}
+	return oidclib.ClientContext(ctx, httpClient)
+}
+
+func callbackValuesFromRequest(request *http.Request) (url.Values, error) {
+	if request == nil {
+		return nil, ErrInvalidCallback
+	}
+	if request.Method == http.MethodPost && isFormURLEncoded(request.Header.Get("Content-Type")) {
+		if err := request.ParseForm(); err != nil {
+			return nil, err
+		}
+		return request.Form, nil
+	}
+	return request.URL.Query(), nil
+}
+
+func isFormURLEncoded(contentType string) bool {
+	contentType = strings.ToLower(strings.TrimSpace(contentType))
+	return contentType == "application/x-www-form-urlencoded" || strings.HasPrefix(contentType, "application/x-www-form-urlencoded;")
+}
+
+func optionalCallbackValue(values url.Values, key string) (string, error) {
+	raw, ok := values[key]
+	if !ok {
+		return "", nil
+	}
+	if len(raw) != 1 {
+		return "", ErrDuplicateParam
+	}
+	return raw[0], nil
+}
+
+func requiredCallbackValue(values url.Values, key string) (string, error) {
+	value, err := optionalCallbackValue(values, key)
+	if err != nil {
+		return "", err
+	}
+	if value == "" {
+		return "", ErrInvalidCallback
+	}
+	return value, nil
+}
+
+func validateURLs(provider identity.Provider, redirectURL string) error {
+	if err := validateIssuerURL(provider.Issuer); err != nil {
+		return err
+	}
+	for _, rawURL := range []string{provider.AuthorizationURL, provider.TokenURL, provider.UserInfoURL, provider.JWKSURL} {
+		if rawURL == "" {
+			continue
+		}
+		if err := validateProviderURL(rawURL); err != nil {
+			return err
+		}
+	}
+	return validateRedirectURL(redirectURL)
+}
+
+func validateIssuerURL(rawURL string) error {
+	parsed, err := parseHTTPSOrLoopbackURL(rawURL)
+	if err != nil {
+		return err
+	}
+	if parsed.RawQuery != "" {
+		return ErrInvalidConfig
+	}
+	return nil
+}
+
+func validateProviderURL(rawURL string) error {
+	_, err := parseHTTPSOrLoopbackURL(rawURL)
+	return err
+}
+
+func validateRedirectURL(rawURL string) error {
+	_, err := parseHTTPSOrLoopbackURL(rawURL)
+	return err
+}
+
+func parseHTTPSOrLoopbackURL(rawURL string) (*url.URL, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.Fragment != "" {
+		return nil, ErrInvalidConfig
+	}
+	if parsed.Scheme == "https" || (parsed.Scheme == "http" && isLoopbackHost(parsed.Hostname())) {
+		return parsed, nil
+	}
+	if parsed.Scheme == "http" {
+		return nil, ErrInsecureURL
+	}
+	return nil, ErrInvalidConfig
+}
+
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

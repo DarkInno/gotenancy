@@ -182,7 +182,7 @@ ctx := tenantctx.WithHost(context.Background())
 - `saas/feature`: plan defaults plus tenant-level feature overrides.
 - `saas/onboarding`: tenant onboarding flow across tenant, plan, subscription, feature, quota, audit, and notification services.
 - `biz/identity`: post-auth tenant user mapping for verified external identity assertions.
-- `biz/identity/oidc`: OIDC authorization-code bridge with PKCE, state, nonce, ID-token verification, and assertion output.
+- `biz/identity/oidc`: OIDC authorization-code bridge with PKCE, state, nonce, ID-token verification, one-time login state storage, and assertion output.
 - `web/*`: tenant middleware and guards for net/http, Gin, Echo, Fiber, and Kratos.
 - `rpc/grpc`: gRPC unary and stream tenant interceptors.
 - `migration`: tenant column and index planning.
@@ -192,7 +192,7 @@ ctx := tenantctx.WithHost(context.Background())
 
 ## Post-Auth Identity Mapping
 
-`biz/identity` maps verified external identities into tenant users and memberships. `biz/identity/oidc` adds a standard OIDC authorization-code bridge for callback processing and ID-token verification. It is still not a full IAM platform: application sessions, account screens, Magic Link delivery, SAML validation, MFA, and WebAuthn remain application or IdP responsibilities.
+`biz/identity` maps verified external identities into tenant users and memberships. `biz/identity/oidc` adds a standard OIDC authorization-code bridge for callback processing, one-time login state, and ID-token verification. It is still not a full IAM platform: application sessions, account screens, Magic Link delivery, SAML validation, MFA, and WebAuthn remain application or IdP responsibilities.
 
 ```go
 oidcClient, err := oidc.New(ctx, oidc.Config{
@@ -201,15 +201,19 @@ oidcClient, err := oidc.New(ctx, oidc.Config{
 	RedirectURL: "https://app.example.com/auth/callback",
 })
 
-login, err := oidcClient.Begin()
-result, err := oidcClient.HandleCallback(ctx, request, login, "tenant-a", "member")
+loginStore := oidc.NewMemoryLoginStore(10 * time.Minute)
+login, err := oidcClient.BeginLogin(ctx, loginStore, oidc.LoginRequest{
+	TenantID: "tenant-a",
+	Roles:    []string{"member"},
+})
+result, err := oidcClient.HandleLoginCallback(ctx, request, loginStore)
 
 users := user.NewMemoryService()
 identityService := identity.NewService(users, identity.WithProviders(identity.GoogleOIDC()))
 session, err := identityService.Authenticate(ctx, result.Assertion)
 ```
 
-Applications must store `login.State`, `login.Nonce`, and `login.PKCEVerifier` in their own secure session layer before redirecting the browser.
+Redirect the browser to `login.URL`. `MemoryLoginStore` is process-local and consumes states once; multi-instance deployments should implement `LoginStore` on top of their secure session or shared cache layer.
 
 ## Verification
 

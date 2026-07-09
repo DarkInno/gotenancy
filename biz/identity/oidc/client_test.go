@@ -99,6 +99,26 @@ func TestCallbackRejectsStateMismatchBeforeExchange(t *testing.T) {
 	}
 }
 
+func TestCallbackRejectsDuplicateStateBeforeExchange(t *testing.T) {
+	ctx := context.Background()
+	server := newOIDCTestServer(t, testServerOptions{})
+	client := newTestClient(t, server)
+
+	_, err := client.Callback(ctx, Callback{
+		Values:        url.Values{"code": {"code-ok"}, "state": {"expected-state", "other-state"}},
+		ExpectedState: "expected-state",
+		ExpectedNonce: "expected-nonce",
+		PKCEVerifier:  "verifier",
+		TenantID:      "tenant-a",
+	})
+	if err != ErrDuplicateParam {
+		t.Fatalf("Callback() error = %v, want ErrDuplicateParam", err)
+	}
+	if server.tokenCalls != 0 {
+		t.Fatalf("token calls = %d, want 0 before unique state passes", server.tokenCalls)
+	}
+}
+
 func TestCallbackRejectsNonceMismatch(t *testing.T) {
 	ctx := context.Background()
 	client := testClient(t, testServerOptions{})
@@ -159,6 +179,27 @@ func TestCallbackRejectsAccessTokenHashMismatch(t *testing.T) {
 	}
 }
 
+func TestHandleCallbackAcceptsFormPost(t *testing.T) {
+	ctx := context.Background()
+	client := testClient(t, testServerOptions{})
+	authRequest, err := client.Begin()
+	if err != nil {
+		t.Fatalf("Begin() error = %v", err)
+	}
+
+	form := callbackValues(authRequest.Nonce, authRequest.State)
+	request := httptest.NewRequest(http.MethodPost, "/callback", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	result, err := client.HandleCallback(ctx, request, authRequest, "tenant-a", "member")
+	if err != nil {
+		t.Fatalf("HandleCallback() error = %v", err)
+	}
+	if result.Assertion.TenantID != "tenant-a" || result.Assertion.Subject != "subject-1" {
+		t.Fatalf("Assertion = %+v, want tenant subject", result.Assertion)
+	}
+}
+
 func TestNewRejectsNonOIDCProvider(t *testing.T) {
 	_, err := New(context.Background(), Config{
 		Provider:    identity.GitHubOAuth(),
@@ -167,6 +208,60 @@ func TestNewRejectsNonOIDCProvider(t *testing.T) {
 	})
 	if err != ErrInvalidConfig {
 		t.Fatalf("New(non OIDC) error = %v, want ErrInvalidConfig", err)
+	}
+}
+
+func TestNewRejectsRemoteHTTPProviderEndpoint(t *testing.T) {
+	_, err := New(context.Background(), Config{
+		Provider: identity.Provider{
+			Key:              identity.ProviderGoogle,
+			Kind:             identity.ProviderKindOIDC,
+			Issuer:           "https://issuer.example.com",
+			AuthorizationURL: "http://issuer.example.com/authorize",
+			TokenURL:         "https://issuer.example.com/token",
+			JWKSURL:          "https://issuer.example.com/jwks",
+		},
+		ClientID:    "client-id",
+		RedirectURL: "https://app.example.com/callback",
+	})
+	if err != ErrInsecureURL {
+		t.Fatalf("New(remote HTTP endpoint) error = %v, want ErrInsecureURL", err)
+	}
+}
+
+func TestNewRejectsRemoteHTTPRedirectURL(t *testing.T) {
+	_, err := New(context.Background(), Config{
+		Provider:    identity.GoogleOIDC(),
+		ClientID:    "client-id",
+		RedirectURL: "http://app.example.com/callback",
+	})
+	if err != ErrInsecureURL {
+		t.Fatalf("New(remote HTTP redirect) error = %v, want ErrInsecureURL", err)
+	}
+}
+
+func TestNewRejectsIssuerWithQuery(t *testing.T) {
+	provider := identity.GoogleOIDC()
+	provider.Issuer = "https://accounts.google.com?tenant=a"
+
+	_, err := New(context.Background(), Config{
+		Provider:    provider,
+		ClientID:    "client-id",
+		RedirectURL: "https://app.example.com/callback",
+	})
+	if err != ErrInvalidConfig {
+		t.Fatalf("New(issuer query) error = %v, want ErrInvalidConfig", err)
+	}
+}
+
+func TestNewAllowsLoopbackHTTPRedirectURL(t *testing.T) {
+	_, err := New(context.Background(), Config{
+		Provider:    identity.GoogleOIDC(),
+		ClientID:    "client-id",
+		RedirectURL: "http://127.0.0.1:8080/callback",
+	})
+	if err != nil {
+		t.Fatalf("New(loopback HTTP redirect) error = %v", err)
 	}
 }
 
@@ -367,5 +462,116 @@ func TestAuthURLWithExplicitValues(t *testing.T) {
 	}
 	if !strings.Contains(authorizationURL, "state=state") || !strings.Contains(authorizationURL, "nonce=nonce") {
 		t.Fatalf("AuthURL() = %q, want state and nonce", authorizationURL)
+	}
+}
+
+func TestHandleLoginCallbackConsumesStoredRequest(t *testing.T) {
+	ctx := context.Background()
+	server := newOIDCTestServer(t, testServerOptions{})
+	client := newTestClient(t, server)
+	store := NewMemoryLoginStore(time.Minute)
+
+	authRequest, err := client.BeginLogin(ctx, store, LoginRequest{
+		TenantID: "tenant-a",
+		Roles:    []string{"member"},
+	})
+	if err != nil {
+		t.Fatalf("BeginLogin() error = %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/callback?"+callbackValues(authRequest.Nonce, authRequest.State).Encode(), nil)
+	result, err := client.HandleLoginCallback(ctx, request, store)
+	if err != nil {
+		t.Fatalf("HandleLoginCallback() error = %v", err)
+	}
+	if result.Assertion.TenantID != "tenant-a" || len(result.Assertion.Roles) != 1 || result.Assertion.Roles[0] != "member" {
+		t.Fatalf("Assertion = %+v, want stored tenant and roles", result.Assertion)
+	}
+
+	_, err = client.HandleLoginCallback(ctx, request, store)
+	if err != ErrLoginNotFound {
+		t.Fatalf("HandleLoginCallback() replay error = %v, want ErrLoginNotFound", err)
+	}
+	if server.tokenCalls != 1 {
+		t.Fatalf("token calls = %d, want 1 after replay rejection", server.tokenCalls)
+	}
+}
+
+func TestMemoryLoginStoreRejectsExpiredLogin(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	store := NewMemoryLoginStore(time.Minute)
+	store.now = func() time.Time { return now }
+
+	err := store.SaveLogin(ctx, Login{
+		AuthRequest: AuthRequest{
+			URL:          "https://issuer.example.com/authorize",
+			State:        "state",
+			Nonce:        "nonce",
+			PKCEVerifier: oauth2.GenerateVerifier(),
+		},
+		TenantID:  "tenant-a",
+		ExpiresAt: now.Add(time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("SaveLogin() error = %v", err)
+	}
+
+	now = now.Add(2 * time.Minute)
+	_, err = store.ConsumeLogin(ctx, "state")
+	if err != ErrLoginExpired {
+		t.Fatalf("ConsumeLogin() error = %v, want ErrLoginExpired", err)
+	}
+	_, err = store.ConsumeLogin(ctx, "state")
+	if err != ErrLoginNotFound {
+		t.Fatalf("ConsumeLogin() second error = %v, want ErrLoginNotFound", err)
+	}
+}
+
+func TestMemoryLoginStoreRejectsOverflow(t *testing.T) {
+	ctx := context.Background()
+	store := NewMemoryLoginStore(time.Minute, WithMaxPendingLogins(1))
+
+	for _, state := range []string{"state-1", "state-2"} {
+		err := store.SaveLogin(ctx, Login{
+			AuthRequest: AuthRequest{
+				URL:          "https://issuer.example.com/authorize",
+				State:        state,
+				Nonce:        "nonce-" + state,
+				PKCEVerifier: oauth2.GenerateVerifier(),
+			},
+			TenantID: "tenant-a",
+		})
+		if state == "state-1" && err != nil {
+			t.Fatalf("SaveLogin(first) error = %v", err)
+		}
+		if state == "state-2" && err != ErrLoginStoreFull {
+			t.Fatalf("SaveLogin(second) error = %v, want ErrLoginStoreFull", err)
+		}
+	}
+}
+
+func TestMemoryLoginStoreZeroValue(t *testing.T) {
+	ctx := context.Background()
+	var store MemoryLoginStore
+
+	err := store.SaveLogin(ctx, Login{
+		AuthRequest: AuthRequest{
+			URL:          "https://issuer.example.com/authorize",
+			State:        "state",
+			Nonce:        "nonce",
+			PKCEVerifier: oauth2.GenerateVerifier(),
+		},
+		TenantID: "tenant-a",
+	})
+	if err != nil {
+		t.Fatalf("SaveLogin() error = %v", err)
+	}
+	login, err := store.ConsumeLogin(ctx, "state")
+	if err != nil {
+		t.Fatalf("ConsumeLogin() error = %v", err)
+	}
+	if login.TenantID != "tenant-a" {
+		t.Fatalf("ConsumeLogin() = %+v, want tenant-a", login)
 	}
 }

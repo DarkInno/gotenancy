@@ -10,7 +10,7 @@
 
 - Query, update, delete, row, and count paths add `tenant_id = ?`.
 - Create and bulk create fill tenant ID and reject mismatched tenant values.
-- `Unscoped` panics in tenant context.
+- `Unscoped` reports an error in tenant context.
 - Raw SQL is rejected in tenant context. `SafeRaw` and `SafeExec` require a context created with `core/context.WithHost`.
 - Preload scopes are augmented with tenant filtering.
 
@@ -54,4 +54,9 @@
 - Web adapters return generic tenant error codes.
 - gRPC interceptors return status errors with generic messages.
 - `obs.Redact` masks common secret fields before log emission.
+- `obs.RedactSlogAttrs` redacts sensitive `slog` attributes, including nested groups, before structured log emission.
+- `obs.RecordSpanError` records sanitized OpenTelemetry error events with the original error type and a caller-provided or generic status description, avoiding accidental tenant or secret leakage through telemetry messages.
 - Tenant IDs are emitted as structured observability fields, not embedded into error strings by framework adapters.
+- `biz/notification.SESNotifier` uses the official AWS SDK v2 `sesv2.SendEmail` client path instead of hand-written SigV4 signing, maps explicit message tags to SES tags, returns safe delivery errors, and treats throttling/server faults as retryable.
+- `biz/notification.ResendNotifier` uses Resend's HTTPS email API with bearer authentication, a required `User-Agent`, optional idempotency key, safe status errors, and retry classification for `429` and `5xx` responses.
+- `biz/notification.WebhookNotifier` requires HTTPS unless the endpoint is loopback or insecure HTTP is explicitly allowed, rejects URL userinfo, emits JSON payloads, supports HMAC signatures, and does not include provider response bodies in error strings.

@@ -20,36 +20,31 @@ func (notifier *MemoryNotifier) Send(ctx context.Context, message Message) error
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if message.TenantID == "" || message.Channel == "" || message.To == "" {
-		return ErrInvalidMessage
+	if notifier == nil {
+		return ErrNilNotifier
+	}
+	if err := message.Validate(); err != nil {
+		return err
 	}
 
 	notifier.mu.Lock()
 	defer notifier.mu.Unlock()
 
-	notifier.messages = append(notifier.messages, cloneMessage(message))
+	notifier.messages = append(notifier.messages, message.Clone())
 	return nil
 }
 
 func (notifier *MemoryNotifier) Messages() []Message {
+	if notifier == nil {
+		return nil
+	}
+
 	notifier.mu.Lock()
 	defer notifier.mu.Unlock()
 
 	messages := make([]Message, len(notifier.messages))
 	for i, message := range notifier.messages {
-		messages[i] = cloneMessage(message)
+		messages[i] = message.Clone()
 	}
 	return messages
-}
-
-func cloneMessage(message Message) Message {
-	if message.Metadata == nil {
-		return message
-	}
-	metadata := make(map[string]string, len(message.Metadata))
-	for key, value := range message.Metadata {
-		metadata[key] = value
-	}
-	message.Metadata = metadata
-	return message
 }

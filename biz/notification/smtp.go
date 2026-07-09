@@ -236,8 +236,8 @@ func validateSMTPConfig(config SMTPConfig) error {
 }
 
 func validateSMTPMessage(config SMTPConfig, message Message) error {
-	if message.TenantID == "" || message.Channel == "" || message.To == "" {
-		return ErrInvalidMessage
+	if err := message.Validate(); err != nil {
+		return err
 	}
 	if message.Channel != config.Channel {
 		return ErrUnsupportedChannel

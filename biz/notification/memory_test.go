@@ -28,4 +28,10 @@ func TestMemoryNotifierValidation(t *testing.T) {
 	if err := NewMemoryNotifier().Send(context.Background(), Message{}); !errors.Is(err, ErrInvalidMessage) {
 		t.Fatalf("Send(invalid) error = %v, want ErrInvalidMessage", err)
 	}
+	if err := (*MemoryNotifier)(nil).Send(context.Background(), Message{}); !errors.Is(err, ErrNilNotifier) {
+		t.Fatalf("nil Send() error = %v, want ErrNilNotifier", err)
+	}
+	if messages := (*MemoryNotifier)(nil).Messages(); messages != nil {
+		t.Fatalf("nil Messages() = %+v, want nil", messages)
+	}
 }

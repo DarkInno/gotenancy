@@ -1,2 +1,3 @@
-// Package obs provides tenant observability fields and redaction helpers for structured logs.
+// Package obs provides tenant observability fields, redaction helpers,
+// slog helpers, and OpenTelemetry API helpers.
 package obs

@@ -2,7 +2,7 @@
 
 All notable changes to GoTenancy are documented in this file.
 
-## Unreleased
+## v0.1.6 - 2026-07-09
 
 - Added SaaS SQL stores for plans, subscriptions, feature flags, and quota usage, including safe table-name validation and MySQL/SQLite/PostgreSQL placeholder rendering.
 - Added plan and subscription Store/List APIs plus Store-oriented memory constructors while keeping existing service constructors.
@@ -11,6 +11,8 @@ All notable changes to GoTenancy are documented in this file.
 - Added `database/sql` SQLStore implementations for `biz/user`, `biz/identity`, and OIDC login state.
 - Added SMTP email delivery for `biz/notification`.
 - Added cursor-based list pagination for tenant, plan, subscription, audit, and membership stores; added an explicit sqlx tenant condition helper for complex SQL; and changed tenant-context GORM `Unscoped` access from panic to returned error.
+- Added `obs` helpers for `slog` structured logging, OpenTelemetry API span attributes, span error recording, and observability benchmarks.
+- Added notification channel routing, sequential fanout, retry, timeout, `NotifierFunc`, Amazon SES API v2 delivery, Resend email API delivery, HTTP webhook delivery with optional HMAC signing, and shared message validation helpers.
 
 ## v0.1.5 - 2026-07-09
 

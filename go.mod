@@ -4,12 +4,16 @@ go 1.23.0
 
 require (
 	entgo.io/ent v0.14.1
+	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.55.2
+	github.com/aws/smithy-go v1.24.0
 	github.com/coreos/go-oidc/v3 v3.15.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-kratos/kratos/v2 v2.9.2
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gofiber/fiber/v2 v2.52.13
 	github.com/labstack/echo/v4 v4.13.4
+	go.opentelemetry.io/otel v1.38.0
+	go.opentelemetry.io/otel/trace v1.38.0
 	golang.org/x/oauth2 v0.30.0
 	google.golang.org/grpc v1.75.1
 	gorm.io/driver/mysql v1.6.0
@@ -19,6 +23,10 @@ require (
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.40.1 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.15 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.15 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.15 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
@@ -27,6 +35,8 @@ require (
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.1 // indirect
 	github.com/go-kratos/aegis v0.2.0 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/form/v4 v4.2.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
@@ -39,7 +49,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
@@ -49,13 +58,14 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.51.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
+	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
+	go.opentelemetry.io/otel/metric v1.38.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/net v0.41.0 // indirect

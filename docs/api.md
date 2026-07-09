@@ -44,7 +44,7 @@ Public package overview.
 | `cache` | Tenant-scoped cache interface, key builder, wrapper, memory adapter, and bounded memory adapter. |
 | `rpc` | Framework-neutral tenant metadata carriers. |
 | `rpc/grpc` | gRPC unary and stream tenant interceptors with default active-status enforcement. |
-| `obs` | Tenant observability fields and redaction. |
+| `obs` | Tenant observability fields, redaction, `slog` helpers, and OpenTelemetry API helpers. |
 
 ## Business Modules
 
@@ -55,7 +55,7 @@ Public package overview.
 | `biz/user` | Users and tenant members with memory implementation and `database/sql` SQLStore. |
 | `biz/rbac` | Tenant-scoped roles, `Role.HasPermission`, permission checks, memory Enforcer, and `database/sql` SQLStore. |
 | `biz/audit` | Tenant-scoped audit event store with memory implementation and `database/sql` SQLStore. |
-| `biz/notification` | Tenant-scoped notification interface, memory notifier, and SMTP email notifier. |
+| `biz/notification` | Tenant-scoped notification interface, memory notifier, SMTP email notifier, Amazon SES API v2 notifier, Resend email API notifier, HTTP webhook notifier with optional HMAC signing, channel router, sequential fanout, retry, and timeout decorators. |
 
 ## Example
 

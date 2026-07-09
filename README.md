@@ -187,8 +187,8 @@ ctx := tenantctx.WithHost(context.Background())
 - `rpc/grpc`: gRPC unary and stream tenant interceptors.
 - `migration`: tenant column and index planning.
 - `cache`: tenant-scoped cache wrapper and memory adapters.
-- `obs`: observability fields and redaction.
-- `biz/*`: identity, user, RBAC, audit, and notification modules with memory stores, SQL stores where persistence is part of the module contract, and SMTP notification delivery.
+- `obs`: tenant observability fields, redaction, `slog` helpers, and OpenTelemetry API helpers.
+- `biz/*`: identity, user, RBAC, audit, and notification modules with memory stores, SQL stores where persistence is part of the module contract, SMTP/SES/Resend/webhook delivery, channel routing, fanout, retry, and timeout helpers.
 
 ## Post-Auth Identity Mapping
 
@@ -247,7 +247,7 @@ web/           Web framework and net/http integration
 migration/     Tenant schema migration planning
 cache/         Tenant-aware cache abstractions
 rpc/           RPC metadata propagation
-obs/           Observability fields and redaction
+obs/           Observability fields, redaction, slog, and OpenTelemetry helpers
 biz/           Identity, user, RBAC, audit, and notification modules
 examples/      Runnable examples
 tests/         Security, cache, concurrency, and local-only DB integration tests

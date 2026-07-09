@@ -19,14 +19,25 @@ const (
 
 // Fields returns tenant observability fields for ctx.
 func Fields(ctx context.Context) map[string]string {
-	fields := map[string]string{}
+	tenantID, side := fieldValues(ctx)
+	if tenantID != "" {
+		return map[string]string{
+			TenantIDField:   tenantID,
+			TenantSideField: side,
+		}
+	}
+	if side != "" {
+		return map[string]string{TenantSideField: side}
+	}
+	return map[string]string{}
+}
+
+func fieldValues(ctx context.Context) (tenantID string, side string) {
 	if tenant, ok := tenantctx.FromContext(ctx); ok {
-		fields[TenantIDField] = tenant.ID.String()
-		fields[TenantSideField] = tenantSide
-		return fields
+		return tenant.ID.String(), tenantSide
 	}
 	if tenantctx.IsHost(ctx) {
-		fields[TenantSideField] = hostSide
+		return "", hostSide
 	}
-	return fields
+	return "", ""
 }

@@ -21,7 +21,7 @@ Future optional extension capabilities can live in separate modules, but the cor
 
 ## Requirements
 
-- Go `1.23+`.
+- Go `1.24+`.
 
 ## Install
 
@@ -186,7 +186,7 @@ ctx := tenantctx.WithHost(context.Background())
 - `web/*`: tenant middleware and guards for net/http, Gin, Echo, Fiber, and Kratos.
 - `rpc/grpc`: gRPC unary and stream tenant interceptors.
 - `migration`: tenant column and index planning.
-- `cache`: tenant-scoped cache wrapper and memory adapters.
+- `cache`: tenant-scoped cache wrapper, memory adapters, and Redis adapter.
 - `obs`: tenant observability fields, redaction, `slog` helpers, and OpenTelemetry API helpers.
 - `biz/*`: identity, user, RBAC, audit, and notification modules with memory stores, SQL stores where persistence is part of the module contract, SMTP/SES/Resend/webhook delivery, channel routing, fanout, retry, and timeout helpers.
 
@@ -226,7 +226,7 @@ go test -race ./...
 On Windows, `go test -race` requires cgo and a C compiler. Without local cgo, run race tests in Docker:
 
 ```bash
-docker run --rm -v "${PWD}:/workspace" -w /workspace -e CGO_ENABLED=1 -e GOFLAGS=-mod=readonly golang:1.23 go test -race ./...
+docker run --rm -v "${PWD}:/workspace" -w /workspace -e CGO_ENABLED=1 -e GOFLAGS=-mod=readonly golang:1.24 go test -race ./...
 ```
 
 Optional database integration tests:
@@ -236,6 +236,14 @@ Optional database integration tests:
 (cd tests/db && GOTENANCY_POSTGRES_DSN='<postgres-dsn>' go test ./... -run TestSQLStorePostgresIntegration -count=1)
 GOTENANCY_MYSQL_DSN='<mysql-dsn>' go test ./data/gorm -run TestMySQLIntegrationEnforcesTenantIsolation -count=1
 ```
+
+Optional Redis cache integration test:
+
+```bash
+GOTENANCY_REDIS_ADDR='localhost:6379' go test ./cache -run TestRedisCacheIntegration -count=1
+```
+
+For production Redis, configure TLS, timeouts, retry limits, and OpenTelemetry on the `go-redis` client before passing it to `cache.NewRedis`.
 
 ## Project Layout
 

@@ -2,11 +2,13 @@
 
 ## Go
 
-- Module language version: Go `1.23`.
-- `go.mod` records this as `go 1.23.0`.
-- CI test jobs should cover Go `1.23.x` and Go `1.26.x`; lint runs on Go `1.26.x`.
+- Module language version: Go `1.24`.
+- `go.mod` records this as `go 1.24.0`.
+- CI test jobs should cover Go `1.24.x` and Go `1.26.x`; lint and vulnerability scans run on Go `1.26.x`.
 
-The module should not require Go `1.24+` dependencies without an explicit compatibility decision.
+Go `1.23` support was dropped because the patched `github.com/go-jose/go-jose/v4` release required by the OIDC path requires Go `1.24.0`.
+
+The module should not require Go `1.25+` dependencies without an explicit compatibility decision.
 
 ## Isolation Model
 
@@ -26,6 +28,7 @@ Independent database and hybrid isolation models are not part of the current API
 | Kratos | `github.com/go-kratos/kratos/v2` v2.9.2 |
 | gRPC | `google.golang.org/grpc` v1.75.1 |
 | OIDC | `github.com/coreos/go-oidc/v3` v3.15.0 and `golang.org/x/oauth2` v0.30.0 |
+| Redis cache | `github.com/redis/go-redis/v9` v9.21.0 |
 
 `core/` remains free of GORM, Ent, sqlx, Redis, and web-framework imports.
 
@@ -45,6 +48,8 @@ Optional integration tests use:
 
 SQLStore database integration tests live in `tests/db` and are not part of the default CI gate.
 
+Redis cache integration tests are optional and run only when `GOTENANCY_REDIS_ADDR` is set. `GOTENANCY_REDIS_PASSWORD` and `GOTENANCY_REDIS_DB` are optional.
+
 ## Verification
 
 ```bash
@@ -52,10 +57,11 @@ go test ./...
 go vet ./...
 go test -race ./...
 go list -m -f '{{.Path}} {{.GoVersion}}' all
+go run golang.org/x/vuln/cmd/govulncheck@v1.5.0 ./...
 ```
 
 On Windows without local cgo, run race tests in Docker:
 
 ```bash
-docker run --rm -v "${PWD}:/workspace" -w /workspace -e CGO_ENABLED=1 -e GOFLAGS=-mod=readonly golang:1.23 go test -race ./...
+docker run --rm -v "${PWD}:/workspace" -w /workspace -e CGO_ENABLED=1 -e GOFLAGS=-mod=readonly golang:1.24 go test -race ./...
 ```

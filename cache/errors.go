@@ -18,4 +18,7 @@ var (
 
 	// ErrInvalidCacheSize reports an invalid bounded memory cache size.
 	ErrInvalidCacheSize = errors.New("gotenancy/cache: invalid cache size")
+
+	// ErrInvalidRedisConfig reports an invalid Redis cache adapter configuration.
+	ErrInvalidRedisConfig = errors.New("gotenancy/cache: invalid redis config")
 )

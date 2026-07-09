@@ -41,7 +41,7 @@ Public package overview.
 | `web/kratos` | Kratos tenant middleware with default active-status enforcement, explicit active-status guard, and host guard. |
 | `web/http` | Standard-library HTTP tenant middleware with default active-status enforcement, explicit active-status guard, and host guard. |
 | `migration` | DDL and seed statement planner for tenant columns and tenant-aware unique indexes. |
-| `cache` | Tenant-scoped cache interface, key builder, wrapper, memory adapter, and bounded memory adapter. |
+| `cache` | Tenant-scoped cache interface, key builder, wrapper, memory adapter, bounded memory adapter, and Redis adapter. |
 | `rpc` | Framework-neutral tenant metadata carriers. |
 | `rpc/grpc` | gRPC unary and stream tenant interceptors with default active-status enforcement. |
 | `obs` | Tenant observability fields, redaction, `slog` helpers, and OpenTelemetry API helpers. |

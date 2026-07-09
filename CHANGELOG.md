@@ -2,6 +2,11 @@
 
 All notable changes to GoTenancy are documented in this file.
 
+## v0.1.7 - 2026-07-09
+
+- Added a Redis cache adapter backed by `github.com/redis/go-redis/v9`, with standalone, cluster, and URL constructors, `PING` health checks, and optional Redis integration tests.
+- Raised the minimum Go version to `1.24.0` to allow patched security dependencies, including `github.com/go-jose/go-jose/v4` v4.1.4.
+
 ## v0.1.6 - 2026-07-09
 
 - Added SaaS SQL stores for plans, subscriptions, feature flags, and quota usage, including safe table-name validation and MySQL/SQLite/PostgreSQL placeholder rendering.

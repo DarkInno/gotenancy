@@ -2,7 +2,8 @@ package feature
 
 import (
 	"context"
-	"sort"
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/DarkInno/gotenancy/core/types"
@@ -112,11 +113,7 @@ func (store *MemoryStore) List(ctx context.Context, tenantID types.TenantID, pla
 		merged[key] = cloneFlag(flag)
 	}
 
-	keys := make([]string, 0, len(merged))
-	for key := range merged {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(merged))
 
 	flags := make([]Flag, 0, len(keys))
 	for _, key := range keys {

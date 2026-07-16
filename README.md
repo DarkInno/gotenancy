@@ -19,6 +19,11 @@ It provides tenant context, tenant resolution, data guards, web/RPC middleware, 
 Independent database and hybrid isolation models are not implemented.
 Future optional extension capabilities can live in separate modules, but the core adoption adapters ship with the main module.
 
+## Architecture
+
+See [docs/architecture.md](docs/architecture.md) for the host-integration,
+tenant-boundary, data-isolation, and external-adapter diagram.
+
 ## Requirements
 
 - Go `1.24+`.

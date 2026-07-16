@@ -1,5 +1,7 @@
 # GoTenancy
 
+[EN](README.md) | [中文](README.zh-CN.md)
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/DarkInno/gotenancy.svg)](https://pkg.go.dev/github.com/DarkInno/gotenancy)
 [![CI](https://github.com/DarkInno/gotenancy/actions/workflows/ci.yml/badge.svg)](https://github.com/DarkInno/gotenancy/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)

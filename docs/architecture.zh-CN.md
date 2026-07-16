@@ -1,13 +1,8 @@
-# Architecture
+# 架构
 
 [EN](architecture.md) | [中文](architecture.zh-CN.md)
 
-GoTenancy is a library assembled into a host Go application; it does not run an
-HTTP/gRPC service or own a deployment on its own. This diagram shows the
-integration boundaries implemented by the module and the normal tenant-scoped
-request path. The storage and external-system nodes are selected and configured
-by the host; they are supported integration points, not services deployed by
-this repository.
+GoTenancy 是一个组装到宿主 Go 应用中的库；它本身不运行 HTTP/gRPC 服务，也不独立拥有部署。本图展示了该模块实现的集成边界以及常规的租户作用域请求路径。存储和外部系统节点由宿主选择和配置；它们是受支持的集成点，而不是本仓库部署的服务。
 
 ```mermaid
 flowchart TB
@@ -83,7 +78,7 @@ flowchart TB
     modules -. "optional notifications" .-> delivery
 ```
 
-## Tenant-scoped request path
+## 租户作用域请求路径
 
 ```mermaid
 flowchart LR
@@ -101,19 +96,12 @@ flowchart LR
     lookup -->|yes| scoped --> handler --> guard --> protected
 ```
 
-## Boundary rules
+## 边界规则
 
-- HTTP and gRPC integrations resolve a tenant, load its metadata, and require
-  it to be active before handing control to the host application.
-- `context.Context` is the scope carrier. Background work must establish a
-  tenant context explicitly; host-wide work must use the deliberate
-  `core/context.WithHost` path.
-- The GORM, Ent, and sqlx adapters derive their data boundary from that context.
-  In the shared-database model, tenant-owned rows carry `tenant_id`.
-- Stores can be in-memory or use a host-provided SQL connection. Redis is an
-  optional host-provided cache adapter, not the source of tenant isolation.
-- `migration.Planner` generates tenant-aware DDL and seed statements; it never
-  executes migrations.
+- HTTP 和 gRPC 集成会解析租户、加载其元数据，并要求租户处于活跃状态，之后才将控制权交给宿主应用。
+- `context.Context` 是作用域载体。后台任务必须显式建立租户上下文；全局主机操作必须使用有意为之的 `core/context.WithHost` 路径。
+- GORM、Ent 和 sqlx 适配器从该上下文派生数据边界。在共享数据库模型中，租户所有的行都带有 `tenant_id`。
+- 存储可以使用内存实现，也可以使用宿主提供的 SQL 连接。Redis 是可选的、由宿主提供的缓存适配器，而不是租户隔离的来源。
+- `migration.Planner` 生成租户感知的 DDL 和 seed 语句；它从不执行迁移。
 
-See [API Reference](api.md) for the package-level surface and
-[Security](security.md) for the detailed guardrail behavior.
+有关包级接口，请参阅 [API 参考](api.zh-CN.md)；有关详细的防护行为，请参阅[安全性](security.zh-CN.md)。

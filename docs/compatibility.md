@@ -1,5 +1,7 @@
 # Compatibility
 
+[EN](compatibility.md) | [中文](compatibility.zh-CN.md)
+
 ## Go
 
 - Module language version: Go `1.24`.

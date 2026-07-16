@@ -1,5 +1,7 @@
 # API Reference
 
+[EN](api.md) | [中文](api.zh-CN.md)
+
 Public package overview.
 
 ## Core

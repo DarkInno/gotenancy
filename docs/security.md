@@ -1,5 +1,7 @@
 # Security
 
+[EN](security.md) | [中文](security.zh-CN.md)
+
 ## Tenant Context
 
 - Tenant operations use `core/context.WithTenant`.

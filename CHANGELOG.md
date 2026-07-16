@@ -1,5 +1,7 @@
 # Changelog
 
+[EN](CHANGELOG.md) | [中文](CHANGELOG.zh-CN.md)
+
 All notable changes to GoTenancy are documented in this file.
 
 ## v0.1.7 - 2026-07-09

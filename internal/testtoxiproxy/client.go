@@ -137,7 +137,9 @@ func (client *Client) request(ctx context.Context, method, path string, payload 
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return responseError(response)

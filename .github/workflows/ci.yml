@@ -87,6 +87,8 @@ jobs:
   integration:
     name: integration (mysql, postgres, redis)
     runs-on: ubuntu-latest
+    env:
+      SQL_CONTRACT_COVERAGE_PROFILE: ${{ runner.temp }}/gotenancy-sql-contract-coverage.out
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -95,15 +97,28 @@ jobs:
         with:
           go-version: "1.24.x"
           cache: true
-      - name: Run disposable integration tests
+      - name: Run disposable integration tests with SQL-contract coverage
         shell: pwsh
-        run: ./tests/run-integration.ps1
+        run: |
+          ./tests/run-integration.ps1 -CoverageProfile $env:SQL_CONTRACT_COVERAGE_PROFILE
+          go tool cover -func=$env:SQL_CONTRACT_COVERAGE_PROFILE | Out-File -FilePath "$env:SQL_CONTRACT_COVERAGE_PROFILE.txt" -Encoding utf8
+      - name: Upload SQL-contract coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gotenancy-sql-contract-coverage
+          path: |
+            ${{ runner.temp }}/gotenancy-sql-contract-coverage.out
+            ${{ runner.temp }}/gotenancy-sql-contract-coverage.out.txt
+          if-no-files-found: error
 
   coverage:
     name: coverage
+    needs: integration
     runs-on: ubuntu-latest
     env:
+      UNIT_COVERAGE_PROFILE: ${{ runner.temp }}/gotenancy-unit-coverage.out
       COVERAGE_PROFILE: ${{ runner.temp }}/gotenancy-coverage.out
+      SQL_CONTRACT_COVERAGE_DIRECTORY: ${{ runner.temp }}/gotenancy-sql-contract-coverage
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -112,9 +127,19 @@ jobs:
         with:
           go-version: "1.24.x"
           cache: true
-      - name: Generate atomic coverage profile
+      - name: Download SQL-contract coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: gotenancy-sql-contract-coverage
+          path: ${{ runner.temp }}/gotenancy-sql-contract-coverage
+      - name: Generate atomic unit coverage profile
         shell: pwsh
-        run: go test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=$env:COVERAGE_PROFILE ./...
+        run: go test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=$env:UNIT_COVERAGE_PROFILE ./...
+      - name: Merge unit and SQL-contract coverage
+        shell: pwsh
+        run: |
+          $sqlProfile = Join-Path $env:SQL_CONTRACT_COVERAGE_DIRECTORY 'gotenancy-sql-contract-coverage.out'
+          ./tests/merge-coverage.ps1 -Profiles @($env:UNIT_COVERAGE_PROFILE, $sqlProfile) -Output $env:COVERAGE_PROFILE
       - name: Enforce coverage floor
         shell: pwsh
         run: ./tests/check-coverage.ps1 -Profile $env:COVERAGE_PROFILE -Minimum 65
@@ -125,4 +150,5 @@ jobs:
           path: |
             ${{ runner.temp }}/gotenancy-coverage.out
             ${{ runner.temp }}/gotenancy-coverage.out.txt
+            ${{ runner.temp }}/gotenancy-unit-coverage.out
           if-no-files-found: error

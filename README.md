@@ -242,12 +242,16 @@ The PowerShell runners start a local disposable Docker Compose environment for M
 
 ```powershell
 # Windows PowerShell; PowerShell 7 users may substitute pwsh.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run-integration.ps1
+# SQL-contract coverage from the disposable MySQL/PostgreSQL tests.
+$sqlProfile = Join-Path $env:TEMP 'gotenancy-sql-contract-coverage.out'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run-integration.ps1 -CoverageProfile $sqlProfile
 
-$profile = Join-Path $env:TEMP 'gotenancy-coverage.out'
-go test -count=1 -covermode=atomic -coverpkg=./... "-coverprofile=$profile" ./...
+$unitProfile = Join-Path $env:TEMP 'gotenancy-unit-coverage.out'
+$profile = Join-Path $env:TEMP 'gotenancy-coverage.out' # merged unit + database profile
+go test -count=1 -covermode=atomic -coverpkg=./... "-coverprofile=$unitProfile" ./...
+./tests/merge-coverage.ps1 -Profiles @($unitProfile, $sqlProfile) -Output $profile
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/check-coverage.ps1 -Profile $profile -Minimum 65
-Remove-Item -LiteralPath $profile, "$profile.txt" -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $unitProfile, $sqlProfile, $profile, "$profile.txt" -Force -ErrorAction SilentlyContinue
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run-chaos.ps1
 ```

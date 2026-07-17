@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -739,6 +740,63 @@ func TestNewSQLLoginStoreValidationAndScan(t *testing.T) {
 	}
 	if login.State != "state" || login.Nonce != "nonce" || login.PKCEVerifier != "verifier" || login.TenantID != "tenant-a" || len(login.Roles) != 1 || login.Roles[0] != "member" {
 		t.Fatalf("scanLogin() = %+v, want decoded login", login)
+	}
+}
+
+func TestRetrySQLLoginConsumeReturnsReplayResultAfterTransientConflict(t *testing.T) {
+	attempts := 0
+	waits := []int{}
+	_, err := retrySQLLoginConsume(context.Background(), func() (Login, error) {
+		attempts++
+		if attempts == 1 {
+			return Login{}, errors.New("could not serialize access due to concurrent update")
+		}
+		return Login{}, ErrLoginNotFound
+	}, func(_ context.Context, attempt int) error {
+		waits = append(waits, attempt)
+		return nil
+	})
+	if !errors.Is(err, ErrLoginNotFound) {
+		t.Fatalf("retrySQLLoginConsume() error = %v, want ErrLoginNotFound", err)
+	}
+	if attempts != 2 || !reflect.DeepEqual(waits, []int{0}) {
+		t.Fatalf("retrySQLLoginConsume() attempts/waits = %d/%#v, want 2/[0]", attempts, waits)
+	}
+}
+
+func TestRetrySQLLoginConsumeHonorsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	attempts := 0
+	_, err := retrySQLLoginConsume(ctx, func() (Login, error) {
+		attempts++
+		return Login{}, errors.New("could not serialize access due to concurrent update")
+	}, waitForSQLLoginConsumeRetry)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("retrySQLLoginConsume() error = %v, want context.Canceled", err)
+	}
+	if attempts != 1 {
+		t.Fatalf("retrySQLLoginConsume() attempts = %d, want 1", attempts)
+	}
+}
+
+func TestRetrySQLLoginConsumeStopsAfterMaximumAttempts(t *testing.T) {
+	retryable := errors.New("could not serialize access due to concurrent update")
+	attempts := 0
+	waits := 0
+	_, err := retrySQLLoginConsume(context.Background(), func() (Login, error) {
+		attempts++
+		return Login{}, retryable
+	}, func(context.Context, int) error {
+		waits++
+		return nil
+	})
+	if !errors.Is(err, retryable) {
+		t.Fatalf("retrySQLLoginConsume() error = %v, want final retryable error", err)
+	}
+	if attempts != sqlLoginConsumeMaxAttempts || waits != sqlLoginConsumeMaxAttempts-1 {
+		t.Fatalf("retrySQLLoginConsume() attempts/waits = %d/%d, want %d/%d", attempts, waits, sqlLoginConsumeMaxAttempts, sqlLoginConsumeMaxAttempts-1)
 	}
 }
 

@@ -106,6 +106,9 @@ func TestNewSQLStoreValidation(t *testing.T) {
 	if store.table != DefaultSQLTableName {
 		t.Fatalf("default table = %q, want %q", store.table, DefaultSQLTableName)
 	}
+	if got := store.keyColumn(); got != "`key`" {
+		t.Fatalf("mysql key column = %q, want quoted key", got)
+	}
 
 	store, err = NewSQLStore(db, WithTableName("public.saas_feature_flags"), WithSQLDialect(SQLDialectPostgres))
 	if err != nil {
@@ -116,6 +119,9 @@ func TestNewSQLStoreValidation(t *testing.T) {
 	}
 	if got := store.placeholders(2, 4); got != "$4, $5" {
 		t.Fatalf("postgres placeholders = %q, want $4, $5", got)
+	}
+	if got := store.keyColumn(); got != "key" {
+		t.Fatalf("postgres key column = %q, want key", got)
 	}
 
 	if _, err := NewSQLStore(db, WithTableName("saas_feature_flags;drop")); !errors.Is(err, ErrInvalidTableName) {

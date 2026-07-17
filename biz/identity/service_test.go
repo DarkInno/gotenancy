@@ -157,3 +157,81 @@ func TestServiceAuthenticateUsesStoredRolesForExistingMember(t *testing.T) {
 		t.Fatalf("Authenticate() roles = %#v, want stored owner role", session.Roles)
 	}
 }
+
+func TestServiceAuthenticateKeepsSharedIdentityRolesTenantScoped(t *testing.T) {
+	ctx := context.Background()
+	users := user.NewMemoryService()
+	links := NewMemoryStore()
+	service := NewService(users, WithStore(links), WithProviders(GoogleOIDC()))
+
+	rolesA := []string{"owner"}
+	metadataA := map[string]string{"tenant": "a"}
+	sessionA, err := service.Authenticate(ctx, Assertion{
+		TenantID:      "tenant-a",
+		Provider:      ProviderGoogle,
+		Subject:       "shared-subject",
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Roles:         rolesA,
+		Metadata:      metadataA,
+	})
+	if err != nil {
+		t.Fatalf("Authenticate(tenant A) error = %v", err)
+	}
+	rolesA[0] = "mutated"
+	metadataA["tenant"] = "mutated"
+	linkA, err := links.GetByExternal(ctx, "tenant-a", ProviderGoogle, "shared-subject")
+	if err != nil {
+		t.Fatalf("GetByExternal(tenant A after source mutation) error = %v", err)
+	}
+	if linkA.Metadata["tenant"] != "a" {
+		t.Fatalf("tenant-A metadata = %#v, want preserved input clone", linkA.Metadata)
+	}
+
+	sessionB, err := service.Authenticate(ctx, Assertion{
+		TenantID:      "tenant-b",
+		Provider:      ProviderGoogle,
+		Subject:       "shared-subject",
+		Email:         "user@example.com",
+		EmailVerified: true,
+		Roles:         []string{"viewer"},
+		Metadata:      map[string]string{"tenant": "b"},
+	})
+	if err != nil {
+		t.Fatalf("Authenticate(tenant B) error = %v", err)
+	}
+	if sessionA.UserID != sessionB.UserID {
+		t.Fatalf("shared subject user IDs = %q and %q, want one global user", sessionA.UserID, sessionB.UserID)
+	}
+	if len(sessionA.Roles) != 1 || sessionA.Roles[0] != "owner" || len(sessionB.Roles) != 1 || sessionB.Roles[0] != "viewer" {
+		t.Fatalf("initial sessions = %+v / %+v, want tenant-scoped owner/viewer roles", sessionA, sessionB)
+	}
+
+	for _, assertion := range []Assertion{
+		{TenantID: "tenant-a", Provider: ProviderGoogle, Subject: "shared-subject", Email: "user@example.com", EmailVerified: true, Roles: []string{"administrator"}},
+		{TenantID: "tenant-b", Provider: ProviderGoogle, Subject: "shared-subject", Email: "user@example.com", EmailVerified: true, Roles: []string{"owner"}},
+	} {
+		session, err := service.Authenticate(ctx, assertion)
+		if err != nil {
+			t.Fatalf("Authenticate(existing %s) error = %v", assertion.TenantID, err)
+		}
+		if assertion.TenantID == "tenant-a" && (len(session.Roles) != 1 || session.Roles[0] != "owner") {
+			t.Fatalf("tenant-A reauthentication roles = %#v, want stored owner", session.Roles)
+		}
+		if assertion.TenantID == "tenant-b" && (len(session.Roles) != 1 || session.Roles[0] != "viewer") {
+			t.Fatalf("tenant-B reauthentication roles = %#v, want stored viewer", session.Roles)
+		}
+	}
+
+	memberA, err := users.GetMember(ctx, "tenant-a", sessionA.UserID)
+	if err != nil {
+		t.Fatalf("GetMember(tenant A) error = %v", err)
+	}
+	memberB, err := users.GetMember(ctx, "tenant-b", sessionA.UserID)
+	if err != nil {
+		t.Fatalf("GetMember(tenant B) error = %v", err)
+	}
+	if len(memberA.Roles) != 1 || memberA.Roles[0] != "owner" || len(memberB.Roles) != 1 || memberB.Roles[0] != "viewer" {
+		t.Fatalf("stored members = %+v / %+v, want tenant-scoped roles", memberA, memberB)
+	}
+}

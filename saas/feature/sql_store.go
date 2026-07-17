@@ -195,8 +195,9 @@ func (store *SQLStore) replaceFlags(ctx context.Context, scope string, ownerID s
 	sort.Strings(keys)
 
 	insertQuery := fmt.Sprintf(
-		"INSERT INTO %s (scope, owner_id, key, enabled, config) VALUES (%s)",
+		"INSERT INTO %s (scope, owner_id, %s, enabled, config) VALUES (%s)",
 		store.table,
+		store.keyColumn(),
 		store.placeholders(5, 1),
 	)
 	for _, key := range keys {
@@ -218,10 +219,12 @@ func (store *SQLStore) replaceFlags(ctx context.Context, scope string, ownerID s
 
 func (store *SQLStore) getFlag(ctx context.Context, scope string, ownerID string, key string) (Flag, error) {
 	query := fmt.Sprintf(
-		"SELECT key, enabled, config FROM %s WHERE scope = %s AND owner_id = %s AND key = %s",
+		"SELECT %s, enabled, config FROM %s WHERE scope = %s AND owner_id = %s AND %s = %s",
+		store.keyColumn(),
 		store.table,
 		store.placeholder(1),
 		store.placeholder(2),
+		store.keyColumn(),
 		store.placeholder(3),
 	)
 	flag, err := scanFlag(store.db.QueryRowContext(ctx, query, scope, ownerID, key))
@@ -236,10 +239,12 @@ func (store *SQLStore) getFlag(ctx context.Context, scope string, ownerID string
 
 func (store *SQLStore) loadFlags(ctx context.Context, scope string, ownerID string) (flags map[string]Flag, err error) {
 	query := fmt.Sprintf(
-		"SELECT key, enabled, config FROM %s WHERE scope = %s AND owner_id = %s ORDER BY key",
+		"SELECT %s, enabled, config FROM %s WHERE scope = %s AND owner_id = %s ORDER BY %s",
+		store.keyColumn(),
 		store.table,
 		store.placeholder(1),
 		store.placeholder(2),
+		store.keyColumn(),
 	)
 	rows, err := store.db.QueryContext(ctx, query, scope, ownerID)
 	if err != nil {
@@ -293,4 +298,11 @@ func (store *SQLStore) placeholders(count int, start int) string {
 
 func (store *SQLStore) placeholder(index int) string {
 	return sqlutil.Placeholder(store.dialect, index)
+}
+
+func (store *SQLStore) keyColumn() string {
+	if store.dialect == SQLDialectMySQL {
+		return "`key`"
+	}
+	return "key"
 }

@@ -10,4 +10,9 @@ require (
 	github.com/lib/pq v1.10.9
 )
 
-require filippo.io/edwards25519 v1.1.0 // indirect
+require (
+	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.15.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
+)

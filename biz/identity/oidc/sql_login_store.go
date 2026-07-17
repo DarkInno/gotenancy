@@ -16,6 +16,8 @@ import (
 const (
 	// DefaultSQLLoginTableName is the default OIDC login state table name.
 	DefaultSQLLoginTableName = "oidc_logins"
+
+	sqlLoginConsumeMaxAttempts = 16
 )
 
 // SQLDialect controls SQL placeholder rendering for SQLLoginStore.
@@ -147,6 +149,49 @@ func (store *SQLLoginStore) ConsumeLogin(ctx context.Context, state string) (log
 	if store == nil || state == "" {
 		return Login{}, ErrInvalidCallback
 	}
+
+	return retrySQLLoginConsume(ctx, func() (Login, error) {
+		return store.consumeLoginOnce(ctx, state)
+	}, waitForSQLLoginConsumeRetry)
+}
+
+func retrySQLLoginConsume(ctx context.Context, consume func() (Login, error), wait func(context.Context, int) error) (Login, error) {
+	var (
+		login Login
+		err   error
+	)
+	for attempt := 0; attempt < sqlLoginConsumeMaxAttempts; attempt++ {
+		login, err = consume()
+		if !sqlutil.IsRetryableTransactionError(err) {
+			return login, err
+		}
+		if attempt == sqlLoginConsumeMaxAttempts-1 {
+			return login, err
+		}
+		if err := wait(ctx, attempt); err != nil {
+			return Login{}, err
+		}
+	}
+	return login, err
+}
+
+func waitForSQLLoginConsumeRetry(ctx context.Context, attempt int) error {
+	shift := attempt
+	if shift > 4 {
+		shift = 4
+	}
+	timer := time.NewTimer(time.Millisecond << shift)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func (store *SQLLoginStore) consumeLoginOnce(ctx context.Context, state string) (login Login, err error) {
 
 	tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {

@@ -28,12 +28,12 @@ Describe 'run-integration.ps1 environment isolation' {
             if ($previousDocker) {
                 Set-Item -Path Function:\global:docker -Value $previousDocker.ScriptBlock
             } else {
-                Remove-Item -Path Function:\global:docker -ErrorAction SilentlyContinue
+                Remove-Item -Path Function:\docker -ErrorAction SilentlyContinue
             }
             if ($previousGo) {
                 Set-Item -Path Function:\global:go -Value $previousGo.ScriptBlock
             } else {
-                Remove-Item -Path Function:\global:go -ErrorAction SilentlyContinue
+                Remove-Item -Path Function:\go -ErrorAction SilentlyContinue
             }
         }
     }
@@ -53,18 +53,63 @@ Describe 'run-integration.ps1 environment isolation' {
 
             . $runnerPath -KeepServices
 
-            ($global:gotenancyDatabaseTestArguments -contains '^Test(SQLStore|QuotaSQLStore|RBACAndUserSQLStore)(MySQL|Postgres)Integration$') | Should Be $true
+            ($global:gotenancyDatabaseTestArguments -contains '^Test(SQLStore|QuotaSQLStore|RBACAndUserSQLStore|IdentitySQLStore|OIDCSQLLoginStore|FeatureSQLStore|PlanSQLStore|SubscriptionSQLStore)(MySQL|Postgres)Integration$') | Should Be $true
         } finally {
             Remove-Variable -Name gotenancyDatabaseTestArguments -Scope Global -ErrorAction SilentlyContinue
             if ($previousDocker) {
                 Set-Item -Path Function:\global:docker -Value $previousDocker.ScriptBlock
             } else {
-                Remove-Item -Path Function:\global:docker -ErrorAction SilentlyContinue
+                Remove-Item -Path Function:\docker -ErrorAction SilentlyContinue
             }
             if ($previousGo) {
                 Set-Item -Path Function:\global:go -Value $previousGo.ScriptBlock
             } else {
-                Remove-Item -Path Function:\global:go -ErrorAction SilentlyContinue
+                Remove-Item -Path Function:\go -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
+    It 'can emit target-package coverage for the database contracts' {
+        $previousDocker = Get-Command docker -CommandType Function -ErrorAction SilentlyContinue
+        $previousGo = Get-Command go -CommandType Function -ErrorAction SilentlyContinue
+        try {
+            $profile = Join-Path $TestDrive 'gotenancy-db-coverage.out'
+            $global:gotenancyDatabaseCoverageArguments = @()
+            Set-Item -Path Function:\global:docker -Value { $global:LASTEXITCODE = 0 }
+            Set-Item -Path Function:\global:go -Value {
+                if ($args -contains './...') {
+                    $global:gotenancyDatabaseCoverageArguments = @($args)
+                }
+                $global:LASTEXITCODE = 0
+            }
+
+            . $runnerPath -KeepServices -CoverageProfile $profile
+
+            $expectedCoveragePackages = @(
+                'github.com/DarkInno/gotenancy/biz/identity',
+                'github.com/DarkInno/gotenancy/biz/identity/oidc',
+                'github.com/DarkInno/gotenancy/biz/rbac',
+                'github.com/DarkInno/gotenancy/biz/user',
+                'github.com/DarkInno/gotenancy/core/store',
+                'github.com/DarkInno/gotenancy/saas/feature',
+                'github.com/DarkInno/gotenancy/saas/plan',
+                'github.com/DarkInno/gotenancy/saas/quota',
+                'github.com/DarkInno/gotenancy/saas/subscription'
+            ) -join ','
+            ($global:gotenancyDatabaseCoverageArguments -contains '-covermode=atomic') | Should Be $true
+            ($global:gotenancyDatabaseCoverageArguments -contains "-coverpkg=$expectedCoveragePackages") | Should Be $true
+            ($global:gotenancyDatabaseCoverageArguments -contains "-coverprofile=$profile") | Should Be $true
+        } finally {
+            Remove-Variable -Name gotenancyDatabaseCoverageArguments -Scope Global -ErrorAction SilentlyContinue
+            if ($previousDocker) {
+                Set-Item -Path Function:\global:docker -Value $previousDocker.ScriptBlock
+            } else {
+                Remove-Item -Path Function:\docker -ErrorAction SilentlyContinue
+            }
+            if ($previousGo) {
+                Set-Item -Path Function:\global:go -Value $previousGo.ScriptBlock
+            } else {
+                Remove-Item -Path Function:\go -ErrorAction SilentlyContinue
             }
         }
     }

@@ -1,4 +1,7 @@
-param([switch]$KeepServices)
+param(
+    [switch]$KeepServices,
+    [string]$CoverageProfile
+)
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
@@ -10,6 +13,17 @@ $managedEnvironmentVariables = @(
     'GOTENANCY_REDIS_DB',
     'GOTENANCY_REDIS_PASSWORD'
 )
+$databaseCoveragePackages = @(
+    'github.com/DarkInno/gotenancy/biz/identity',
+    'github.com/DarkInno/gotenancy/biz/identity/oidc',
+    'github.com/DarkInno/gotenancy/biz/rbac',
+    'github.com/DarkInno/gotenancy/biz/user',
+    'github.com/DarkInno/gotenancy/core/store',
+    'github.com/DarkInno/gotenancy/saas/feature',
+    'github.com/DarkInno/gotenancy/saas/plan',
+    'github.com/DarkInno/gotenancy/saas/quota',
+    'github.com/DarkInno/gotenancy/saas/subscription'
+) -join ','
 $previousEnvironment = @{}
 foreach ($name in $managedEnvironmentVariables) {
     $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -35,7 +49,11 @@ try {
     Invoke-Checked go @('test', './data/gorm', '-run', '^TestMySQLIntegrationEnforcesTenantIsolation$', '-count=1')
     Push-Location (Join-Path $repoRoot 'tests/db')
     try {
-        Invoke-Checked go @('test', './...', '-run', '^Test(SQLStore|QuotaSQLStore|RBACAndUserSQLStore)(MySQL|Postgres)Integration$', '-count=1')
+        $databaseTestArguments = @('test', './...', '-run', '^Test(SQLStore|QuotaSQLStore|RBACAndUserSQLStore|IdentitySQLStore|OIDCSQLLoginStore|FeatureSQLStore|PlanSQLStore|SubscriptionSQLStore)(MySQL|Postgres)Integration$', '-count=1')
+        if ($CoverageProfile) {
+            $databaseTestArguments += @('-covermode=atomic', "-coverpkg=$databaseCoveragePackages", "-coverprofile=$CoverageProfile")
+        }
+        Invoke-Checked -File go -Arguments $databaseTestArguments
     } finally {
         Pop-Location
     }

@@ -97,17 +97,23 @@ func (store *SQLStore) Link(ctx context.Context, link Link) error {
 		return err
 	}
 
-	current, err := store.GetByExternal(ctx, link.TenantID, link.Provider, link.Subject)
-	switch {
-	case err == nil && current.UserID != link.UserID:
-		return ErrIdentityConflict
-	case err == nil:
-		return store.updateLink(ctx, link)
-	case errors.Is(err, ErrIdentityNotFound):
-		return store.insertLink(ctx, link)
-	default:
-		return err
+	for attempt := 0; attempt < 2; attempt++ {
+		current, err := store.GetByExternal(ctx, link.TenantID, link.Provider, link.Subject)
+		switch {
+		case err == nil && current.UserID != link.UserID:
+			return ErrIdentityConflict
+		case err == nil:
+			return store.updateLink(ctx, link)
+		case errors.Is(err, ErrIdentityNotFound):
+			err = store.insertLink(ctx, link)
+			if !errors.Is(err, ErrIdentityConflict) || attempt == 1 {
+				return err
+			}
+		default:
+			return err
+		}
 	}
+	return ErrIdentityConflict
 }
 
 // GetByExternal returns an identity link by external provider subject.

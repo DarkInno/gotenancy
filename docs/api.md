@@ -48,6 +48,7 @@ SaaS supports one topology: a shared application database and shared tables, wit
 | `migration` | DDL and seed statement planner for tenant columns and tenant-aware unique indexes. |
 | `cache` | Tenant-scoped cache interface, key builder, wrapper, memory adapter, bounded memory adapter, and Redis adapter. |
 | `rpc` | Framework-neutral tenant metadata carriers. |
+| `rpc/mq` | SDK-free NATS, RabbitMQ, and Kafka message-header carrier interfaces and adapters for `rpc.InjectTenant` and `rpc.ExtractTenant`; broker clients remain host-owned. |
 | `rpc/grpc` | gRPC unary and stream tenant interceptors with default active-status enforcement. |
 | `obs` | Tenant and deployment-unit-ID observability fields, redaction, `slog` helpers, and OpenTelemetry API helpers. |
 

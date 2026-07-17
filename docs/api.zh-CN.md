@@ -48,6 +48,7 @@ SaaS 仅支持一种拓扑：共享应用数据库和共享表，每一行租户
 | `migration` | 用于租户列和租户感知唯一索引的 DDL 与 seed 语句规划器。 |
 | `cache` | 租户作用域缓存接口、键构建器、包装器、内存适配器、有界内存适配器和 Redis 适配器。 |
 | `rpc` | 与框架无关的租户元数据载体。 |
+| `rpc/mq` | 不依赖 SDK 的 NATS、RabbitMQ 和 Kafka 消息 header 载体接口与适配器，供 `rpc.InjectTenant` 和 `rpc.ExtractTenant` 使用；消息队列客户端仍由宿主负责。 |
 | `rpc/grpc` | 默认强制活跃状态的 gRPC unary 和 stream 租户拦截器。 |
 | `obs` | 租户与部署单元 ID 可观测性字段、脱敏、`slog` 辅助函数和 OpenTelemetry API 辅助函数。 |
 

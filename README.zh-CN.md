@@ -135,12 +135,80 @@ go -C examples/quickstart run .
 go -C examples/gin-gorm run .
 go -C examples/grpc run .
 go -C examples/ent run .
+go -C examples/http-servemux run .
 ```
 
 - [examples/quickstart](examples/quickstart)：最小化 GORM 创建流程。
 - [examples/gin-gorm](examples/gin-gorm)：Gin header 解析器、租户存储校验、请求上下文注入和 GORM 查询防护。
 - [examples/grpc](examples/grpc)：解析租户元数据并注入租户上下文的 unary gRPC 拦截器。
 - [examples/ent](examples/ent)：使用存储层接口（由生成的 builder 暴露）的 Ent 查询和变更过滤器。
+- [examples/http-servemux](examples/http-servemux)：使用标准库 `http.ServeMux` 的路由，展示 header 解析、活跃租户校验、请求上下文注入和 GORM DryRun 隔离。
+
+## 标准库 `http.ServeMux`
+
+完整的 [ServeMux 示例](examples/http-servemux) 在路由层只使用 `net/http`，不依赖
+第三方 HTTP 框架。它在 `http.NewServeMux` 上注册 `GET /orders`，以 `web/http.TenantMiddleware` 包装
+该 mux，并在进程内运行请求，不会启动监听器或连接真实数据库。
+
+请求携带默认 `x-tenant-id` header 时，完整集成路径如下：
+
+1. `resolver.NewHeaderContrib` 从请求 header 解析租户 ID。
+2. `web/http.TenantMiddleware` 通过 `core/store.Store` 加载租户，并且只允许活跃租户。
+3. 中间件在调用路由处理器之前，使用 `tenantctx.WithTenant` 将租户放入请求的 `context.Context`。
+4. 处理器将请求上下文传给 GORM；租户插件会将 `tenant_id` 条件加入生成的查询。
+
+示例会输出包含租户 ID、SQL 和变量的成功响应；同时展示缺少 header
+（`401 tenant_required`）、未知租户（`403 tenant_forbidden`）和已暂停租户
+（`403 tenant_inactive`）的标准失败响应。
+
+## 消息队列租户上下文传播
+
+`rpc/mq` 在不引入消息队列 SDK 的前提下，将宿主提供的消息 header 适配为现有的、
+与框架无关的 `rpc.Carrier` 接口。
+
+| 消息队列 | Header 接口 | `rpc.Carrier` 适配器 |
+|---|---|---|
+| NATS | `mq.NATSHeaders` | 通过 `mq.NewNATSCarrier` 创建的 `mq.NATSCarrier` |
+| RabbitMQ | `mq.RabbitMQHeaders` | 通过 `mq.NewRabbitMQCarrier` 创建的 `mq.RabbitMQCarrier` |
+| Kafka | `mq.KafkaHeaders` | 通过 `mq.NewKafkaCarrier` 创建的 `mq.KafkaCarrier` |
+
+生产端需要先适配消息 header，再注入已经存在于应用上下文中的租户。下面以
+NATS 形式说明；RabbitMQ 和 Kafka 仅需替换为各自的构造函数。传入空键会使用默认
+的 `x-tenant-id` 元数据键：
+
+```go
+func injectNATSTenant(ctx context.Context, headers mq.NATSHeaders) error {
+	carrier, err := mq.NewNATSCarrier(headers)
+	if err != nil {
+		return err
+	}
+	return rpc.InjectTenant(ctx, carrier, "")
+}
+```
+
+消费端中，提取 header 只是第一步。宿主必须在执行租户作用域工作前加载并校验租户：
+
+```go
+func tenantMessageContext(ctx context.Context, headers mq.NATSHeaders, tenants store.Store) (context.Context, bool) {
+	carrier, err := mq.NewNATSCarrier(headers)
+	if err != nil {
+		return nil, false
+	}
+	tenantID, err := rpc.ExtractTenant(carrier, "", types.TenantIDStrategyString)
+	if err != nil {
+		return nil, false
+	}
+	tenant, err := tenants.Get(ctx, tenantID)
+	if err != nil || tenant.Status != types.TenantStatusActive {
+		return nil, false
+	}
+	return tenantctx.WithTenant(ctx, tenant), true
+}
+```
+
+这些适配器只传递元数据：不会建立 NATS、RabbitMQ 或 Kafka 客户端连接，不会发布或
+消费消息、确认消息、执行重试或死信策略，也不会校验租户是否存在及处于活跃状态；这些
+职责仍由宿主应用承担。
 
 ## 常见模式
 

@@ -143,12 +143,89 @@ go -C examples/quickstart run .
 go -C examples/gin-gorm run .
 go -C examples/grpc run .
 go -C examples/ent run .
+go -C examples/http-servemux run .
 ```
 
 - [examples/quickstart](examples/quickstart): minimal GORM create flow.
 - [examples/gin-gorm](examples/gin-gorm): Gin header resolver, tenant store validation, request context injection, and GORM query guard.
 - [examples/grpc](examples/grpc): unary gRPC interceptor that resolves tenant metadata and injects tenant context.
 - [examples/ent](examples/ent): Ent query and mutation filters using the storage-level interfaces generated builders expose.
+- [examples/http-servemux](examples/http-servemux): standard-library `http.ServeMux` route with header resolution, active-tenant validation, request-context injection, and GORM DryRun isolation.
+
+## Standard-library `http.ServeMux`
+
+The complete [ServeMux example](examples/http-servemux) uses `net/http` for
+routing without a third-party HTTP framework. It registers `GET /orders` on
+`http.NewServeMux`, wraps that mux with
+`web/http.TenantMiddleware`, and runs an in-process request rather than opening
+a listener or database connection.
+
+For a request with the default `x-tenant-id` header, its integration path is:
+
+1. `resolver.NewHeaderContrib` resolves the tenant ID from the request header.
+2. `web/http.TenantMiddleware` loads the tenant through `core/store.Store` and
+   accepts only an active tenant.
+3. The middleware attaches that tenant with `tenantctx.WithTenant` to the
+   request's `context.Context` before it calls the route handler.
+4. The handler passes the request context to GORM; the tenant plugin adds the
+   `tenant_id` predicate to the generated query.
+
+The example prints the success response with the tenant ID, SQL, and variables.
+It also demonstrates the standard failure responses for a missing header
+(`401 tenant_required`), an unknown tenant (`403 tenant_forbidden`), and a
+suspended tenant (`403 tenant_inactive`).
+
+## Message-queue tenant propagation
+
+`rpc/mq` adapts host-provided message headers to the existing framework-neutral
+`rpc.Carrier` interface without importing a broker SDK.
+
+| Broker | Header interface | `rpc.Carrier` adapter |
+|---|---|---|
+| NATS | `mq.NATSHeaders` | `mq.NATSCarrier` via `mq.NewNATSCarrier` |
+| RabbitMQ | `mq.RabbitMQHeaders` | `mq.RabbitMQCarrier` via `mq.NewRabbitMQCarrier` |
+| Kafka | `mq.KafkaHeaders` | `mq.KafkaCarrier` via `mq.NewKafkaCarrier` |
+
+On the producer, adapt the message headers and inject the tenant that is
+already present in the application context. This NATS-shaped call applies
+equally to the RabbitMQ and Kafka constructors; an empty key selects the
+default `x-tenant-id` metadata key.
+
+```go
+func injectNATSTenant(ctx context.Context, headers mq.NATSHeaders) error {
+	carrier, err := mq.NewNATSCarrier(headers)
+	if err != nil {
+		return err
+	}
+	return rpc.InjectTenant(ctx, carrier, "")
+}
+```
+
+On the consumer, header extraction is only the first step. The host must load
+and validate the tenant before it invokes tenant-scoped work:
+
+```go
+func tenantMessageContext(ctx context.Context, headers mq.NATSHeaders, tenants store.Store) (context.Context, bool) {
+	carrier, err := mq.NewNATSCarrier(headers)
+	if err != nil {
+		return nil, false
+	}
+	tenantID, err := rpc.ExtractTenant(carrier, "", types.TenantIDStrategyString)
+	if err != nil {
+		return nil, false
+	}
+	tenant, err := tenants.Get(ctx, tenantID)
+	if err != nil || tenant.Status != types.TenantStatusActive {
+		return nil, false
+	}
+	return tenantctx.WithTenant(ctx, tenant), true
+}
+```
+
+The adapters transport metadata only. They do not establish NATS, RabbitMQ, or
+Kafka client connections; publish or consume messages; acknowledge messages;
+apply retry or dead-letter policy; or validate that a tenant exists and is
+active. Those responsibilities remain with the host application.
 
 ## Common Patterns
 

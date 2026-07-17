@@ -3,19 +3,21 @@
 [EN](architecture.md) | [中文](architecture.zh-CN.md)
 
 SaaS is a library assembled into a host Go application; it does not run an
-HTTP/gRPC service or own a deployment on its own. This diagram shows the
-integration boundaries implemented by the module and the normal tenant-scoped
-request path. The storage and external-system nodes are selected and configured
-by the host; they are supported integration points, not services deployed by
-this repository.
+HTTP/gRPC service, a message broker, broker client connections, or physical
+deployment infrastructure. This diagram shows the integration boundaries
+implemented by the module and the normal tenant-scoped request path. The
+storage, broker, and external-system nodes are selected and configured by the
+host; they are supported integration points, not services deployed by this
+repository.
 
 ```mermaid
 flowchart TB
-    caller["HTTP/gRPC clients<br/>CLI and background jobs"]
+    caller["HTTP/gRPC clients<br/>message producers, CLI, and background jobs"]
 
     subgraph host["Host Go application"]
         web["HTTP integration<br/>web/http, Gin, Echo, Fiber, Kratos"]
         grpc["gRPC integration<br/>rpc/grpc interceptors"]
+        mq["Message-queue integration<br/>rpc/mq carriers; host owns client loops"]
         direct["Direct invocation<br/>workers, CLI, application services"]
         app["Handlers and application services<br/>propagate context.Context"]
         modules["SaaS and business modules<br/>tenant, plan, subscription, quota, feature, onboarding, and biz/*"]
@@ -25,6 +27,7 @@ flowchart TB
     subgraph boundary["Tenant boundary"]
         resolver["HTTP tenant resolver<br/>header, cookie, query, domain, token"]
         carrier["RPC metadata carrier<br/>rpc"]
+        mqCarrier["MQ message-header carriers<br/>rpc/mq: NATS, RabbitMQ, Kafka"]
         tenantStore["Tenant metadata store<br/>core/store.Store"]
         tenantContext["Tenant or explicit host context<br/>core/context"]
         tenantTypes["Tenant IDs, metadata, and state<br/>core/types"]
@@ -43,17 +46,21 @@ flowchart TB
         stores["Memory or host-provided database/sql stores<br/>core, lifecycle modules, and biz"]
         database["Host-managed shared application database and schema<br/>tenant-owned rows include tenant_id"]
         redis["Host-provided optional Redis cache"]
+        broker["Host-managed NATS, RabbitMQ, or Kafka"]
         idp["OIDC identity provider"]
         delivery["SMTP, SES, Resend, or webhook"]
     end
 
     caller --> web
     caller --> grpc
+    caller --> mq
     caller --> direct
     web --> resolver
     grpc --> carrier
+    mq --> mqCarrier
     resolver --> tenantStore
     carrier --> tenantStore
+    mqCarrier --> tenantStore
     direct --> tenantContext
     tenantStore --> tenantContext
     tenantTypes -. "defines" .-> resolver
@@ -78,6 +85,8 @@ flowchart TB
     ent --> database
     sqlx --> database
     cache --> redis
+    app --> mq
+    mq --> broker
     migration -. "plans; does not execute" .-> database
     modules -. "optional OIDC bridge" .-> idp
     modules -. "optional notifications" .-> delivery
@@ -87,7 +96,7 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    inbound["Incoming HTTP request or gRPC metadata"]
+    inbound["Incoming HTTP request, gRPC metadata,<br/>or MQ message headers"]
     resolve["Resolve tenant ID"]
     lookup{"Tenant exists<br/>and is active?"}
     reject["Reject with tenant_required,<br/>tenant_forbidden, or tenant_inactive"]
@@ -110,6 +119,14 @@ flowchart LR
   `context.Context`. The directory does not choose a database connection,
   route traffic, or move data; those operations remain host-owned. See
   [Deployment Units](deployment.md).
+- `rpc/mq` adapts NATS, RabbitMQ, and Kafka message headers only. On outbound
+  work, the host calls `rpc.InjectTenant` from an established tenant context;
+  on inbound work, it calls `rpc.ExtractTenant`, loads the tenant through
+  `core/store.Store`, verifies that it is active, and then calls
+  `core/context.WithTenant` before dispatching the message.
+- The host owns all broker I/O and message policy. The MQ adapters do not open
+  connections, publish or consume messages, acknowledge them, apply retries or
+  dead-letter handling, or validate tenant metadata.
 - `context.Context` is the scope carrier. Background work must establish a
   tenant context explicitly; host-wide work must use the deliberate
   `core/context.WithHost` path.

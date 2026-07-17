@@ -13,6 +13,9 @@ coverage.html
 .env.*
 !.env.example
 
+# Local worktrees
+/.worktrees/
+
 # Editor and OS files
 .idea/
 .vscode/

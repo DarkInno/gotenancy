@@ -98,3 +98,31 @@ jobs:
       - name: Run disposable integration tests
         shell: pwsh
         run: ./tests/run-integration.ps1
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    env:
+      COVERAGE_PROFILE: ${{ runner.temp }}/gotenancy-coverage.out
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.x"
+          cache: true
+      - name: Generate atomic coverage profile
+        shell: pwsh
+        run: go test -count=1 -covermode=atomic -coverpkg=./... -coverprofile=$env:COVERAGE_PROFILE ./...
+      - name: Enforce coverage floor
+        shell: pwsh
+        run: ./tests/check-coverage.ps1 -Profile $env:COVERAGE_PROFILE -Minimum 65
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gotenancy-coverage
+          path: |
+            ${{ runner.temp }}/gotenancy-coverage.out
+            ${{ runner.temp }}/gotenancy-coverage.out.txt
+          if-no-files-found: error

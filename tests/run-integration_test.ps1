@@ -38,7 +38,7 @@ Describe 'run-integration.ps1 environment isolation' {
         }
     }
 
-    It 'runs the quota SQL contracts for both disposable database dialects' {
+    It 'runs the added SQL store contracts for both disposable database dialects' {
         $previousDocker = Get-Command docker -CommandType Function -ErrorAction SilentlyContinue
         $previousGo = Get-Command go -CommandType Function -ErrorAction SilentlyContinue
         try {
@@ -53,7 +53,7 @@ Describe 'run-integration.ps1 environment isolation' {
 
             . $runnerPath -KeepServices
 
-            ($global:gotenancyDatabaseTestArguments -contains '^Test(SQLStore|QuotaSQLStore)(MySQL|Postgres)Integration$') | Should Be $true
+            ($global:gotenancyDatabaseTestArguments -contains '^Test(SQLStore|QuotaSQLStore|RBACAndUserSQLStore)(MySQL|Postgres)Integration$') | Should Be $true
         } finally {
             Remove-Variable -Name gotenancyDatabaseTestArguments -Scope Global -ErrorAction SilentlyContinue
             if ($previousDocker) {

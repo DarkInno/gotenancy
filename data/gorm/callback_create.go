@@ -61,6 +61,10 @@ func (plugin *Plugin) setTenantField(tx *gorm.DB, tenantID types.TenantID) error
 }
 
 func setTenantFieldValue(tx *gorm.DB, field *schema.Field, value reflect.Value, tenantID types.TenantID) error {
+	if !value.IsValid() || !value.CanAddr() {
+		return ErrTenantFieldNotFound
+	}
+
 	current, zero := field.ValueOf(tx.Statement.Context, value)
 	if !zero && fmt.Sprint(current) != tenantID.String() {
 		return ErrTenantMismatch

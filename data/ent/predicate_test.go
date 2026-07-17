@@ -109,6 +109,68 @@ func TestPredicateValidatesFieldNames(t *testing.T) {
 	}
 }
 
+func TestTenantPredicateAndMutationHelpersCoverTypedValues(t *testing.T) {
+	ctx := tenantctx.WithTenant(context.Background(), types.Tenant{ID: "tenant-a"})
+	predicate, err := TenantPredicate(ctx)
+	if err != nil {
+		t.Fatalf("TenantPredicate() error = %v", err)
+	}
+	selector := testSelector()
+	predicate(selector)
+	query, args := selector.Query()
+	if !strings.Contains(query, "`orders`.`tenant_id` = ?") || !reflect.DeepEqual(args, []any{"tenant-a"}) {
+		t.Fatalf("TenantPredicate() query = %q args = %#v", query, args)
+	}
+
+	value := "tenant-a"
+	var nilValue *string
+	for _, test := range []struct {
+		name  string
+		value entgo.Value
+		want  bool
+	}{
+		{name: "string", value: "tenant-a", want: true},
+		{name: "tenant id", value: types.TenantID("tenant-a"), want: true},
+		{name: "pointer", value: &value, want: true},
+		{name: "nil pointer", value: nilValue, want: false},
+		{name: "wrong type", value: 42, want: false},
+		{name: "wrong tenant", value: "tenant-b", want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := tenantMutationValueMatches(test.value, "tenant-a"); got != test.want {
+				t.Fatalf("tenantMutationValueMatches(%#v) = %v, want %v", test.value, got, test.want)
+			}
+		})
+	}
+	if !tenantMutationFieldMatches("TENANT_ID", []string{"tenant_id"}) {
+		t.Fatal("tenantMutationFieldMatches() did not ignore case")
+	}
+	if tenantMutationFieldMatches("owner_id", []string{"tenant_id"}) {
+		t.Fatal("tenantMutationFieldMatches() matched an unrelated field")
+	}
+}
+
+func TestFiltersRejectNilAndUnsupportedValues(t *testing.T) {
+	ctx := tenantctx.WithTenant(context.Background(), types.Tenant{ID: "tenant-a"})
+	if err := NewQueryFilter(Config{}).Apply(ctx, nil); !errors.Is(err, ErrNilQuery) {
+		t.Fatalf("QueryFilter.Apply(nil) error = %v, want ErrNilQuery", err)
+	}
+	if err := NewMutationFilter(Config{}).Apply(ctx, nil); !errors.Is(err, ErrNilMutation) {
+		t.Fatalf("MutationFilter.Apply(nil) error = %v, want ErrNilMutation", err)
+	}
+	if err := NewMutationFilter(Config{}).Apply(ctx, newFakeMutation(entgo.Op(0))); !errors.Is(err, ErrUnsupportedMutation) {
+		t.Fatalf("MutationFilter.Apply(unsupported) error = %v, want ErrUnsupportedMutation", err)
+	}
+
+	unsupported := Hook(Config{})(entgo.MutateFunc(func(context.Context, entgo.Mutation) (entgo.Value, error) {
+		t.Fatal("next mutator should not run for unsupported mutation")
+		return nil, nil
+	}))
+	if _, err := unsupported.Mutate(ctx, &unsupportedEntMutation{}); !errors.Is(err, ErrUnsupportedMutation) {
+		t.Fatalf("Hook(unsupported mutation) error = %v, want ErrUnsupportedMutation", err)
+	}
+}
+
 func TestFilterQueryAddsTenantPredicate(t *testing.T) {
 	ctx := tenantctx.WithTenant(context.Background(), types.Tenant{ID: "tenant-a"})
 	query := &fakeQuery{}
@@ -403,6 +465,30 @@ func (mutation *fakeMutation) sql() (string, []any) {
 type fakeEntMutation struct {
 	*fakeMutation
 }
+
+type unsupportedEntMutation struct{}
+
+func (unsupportedEntMutation) Op() entgo.Op                                          { return entgo.OpCreate }
+func (unsupportedEntMutation) Type() string                                          { return "Order" }
+func (unsupportedEntMutation) Fields() []string                                      { return nil }
+func (unsupportedEntMutation) Field(string) (entgo.Value, bool)                      { return nil, false }
+func (unsupportedEntMutation) SetField(string, entgo.Value) error                    { return nil }
+func (unsupportedEntMutation) AddedFields() []string                                 { return nil }
+func (unsupportedEntMutation) AddedField(string) (entgo.Value, bool)                 { return nil, false }
+func (unsupportedEntMutation) AddField(string, entgo.Value) error                    { return nil }
+func (unsupportedEntMutation) ClearedFields() []string                               { return nil }
+func (unsupportedEntMutation) FieldCleared(string) bool                              { return false }
+func (unsupportedEntMutation) ClearField(string) error                               { return nil }
+func (unsupportedEntMutation) ResetField(string) error                               { return nil }
+func (unsupportedEntMutation) AddedEdges() []string                                  { return nil }
+func (unsupportedEntMutation) AddedIDs(string) []entgo.Value                         { return nil }
+func (unsupportedEntMutation) RemovedEdges() []string                                { return nil }
+func (unsupportedEntMutation) RemovedIDs(string) []entgo.Value                       { return nil }
+func (unsupportedEntMutation) ClearedEdges() []string                                { return nil }
+func (unsupportedEntMutation) EdgeCleared(string) bool                               { return false }
+func (unsupportedEntMutation) ClearEdge(string) error                                { return nil }
+func (unsupportedEntMutation) ResetEdge(string) error                                { return nil }
+func (unsupportedEntMutation) OldField(context.Context, string) (entgo.Value, error) { return nil, nil }
 
 type fakeTrackedMutation struct {
 	*fakeMutation

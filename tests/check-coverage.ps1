@@ -6,12 +6,22 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $Profile -PathType Leaf)) {
-    throw "coverage profile not found: $Profile"
+	throw "coverage profile not found: $Profile"
 }
 
-$summary = & go tool cover "-func=$Profile"
-if ($LASTEXITCODE -ne 0) {
-    throw "go tool cover failed with exit code $LASTEXITCODE"
+$workspaceDirectory = Join-Path $PSScriptRoot 'coverage'
+if (-not (Test-Path -LiteralPath (Join-Path $workspaceDirectory 'go.work') -PathType Leaf)) {
+	throw "coverage workspace not found: $workspaceDirectory"
+}
+
+Push-Location $workspaceDirectory
+try {
+	$summary = & go tool cover "-func=$Profile"
+	if ($LASTEXITCODE -ne 0) {
+		throw "go tool cover failed with exit code $LASTEXITCODE"
+	}
+} finally {
+	Pop-Location
 }
 
 $summaryPath = "$Profile.txt"

@@ -12,7 +12,7 @@ Describe 'run-integration.ps1 environment isolation' {
 
             Set-Item -Path Function:\global:docker -Value { $global:LASTEXITCODE = 0 }
             Set-Item -Path Function:\global:go -Value {
-                if ($args -contains './cache') {
+                if (($args -contains './...') -and $PWD.Path.Replace('/', '\').EndsWith('cache\redis')) {
                     $global:saasObservedRedisPassword = [Environment]::GetEnvironmentVariable('SAAS_REDIS_PASSWORD', 'Process')
                 }
                 $global:LASTEXITCODE = 0
@@ -45,7 +45,7 @@ Describe 'run-integration.ps1 environment isolation' {
             $global:saasDatabaseTestArguments = @()
             Set-Item -Path Function:\global:docker -Value { $global:LASTEXITCODE = 0 }
             Set-Item -Path Function:\global:go -Value {
-                if ($args -contains './...') {
+                if (($args -contains './...') -and $PWD.Path.Replace('/', '\').EndsWith('tests\db')) {
                     $global:saasDatabaseTestArguments = @($args)
                 }
                 $global:LASTEXITCODE = 0
@@ -77,7 +77,7 @@ Describe 'run-integration.ps1 environment isolation' {
             $global:saasDatabaseCoverageArguments = @()
             Set-Item -Path Function:\global:docker -Value { $global:LASTEXITCODE = 0 }
             Set-Item -Path Function:\global:go -Value {
-                if ($args -contains './...') {
+                if (($args -contains './...') -and $PWD.Path.Replace('/', '\').EndsWith('tests\db')) {
                     $global:saasDatabaseCoverageArguments = @($args)
                 }
                 $global:LASTEXITCODE = 0

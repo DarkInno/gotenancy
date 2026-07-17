@@ -11,14 +11,15 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: go test (${{ matrix.go-version }})
+  core:
+    name: core (Go ${{ matrix.go-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         go-version:
-          - "1.24.x"
+          - "1.22.x"
+          - "1.23.x"
           - "1.26.x"
     steps:
       - name: Checkout
@@ -29,10 +30,14 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
 
-      - name: Check module tidiness
-        if: matrix.go-version == '1.24.x'
-        run: go mod tidy -diff
+      - name: Check core module tidiness
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
 
       - name: Go vet
         run: go vet ./...
@@ -40,15 +45,121 @@ jobs:
       - name: Unit tests
         run: go test ./...
 
-      - name: Example smoke tests
-        run: |
-          go run ./examples/quickstart
-          go run ./examples/gin-gorm
-          go run ./examples/grpc
-          go run ./examples/ent
-
       - name: Race tests
         run: go test -race ./...
+
+  optional-go122:
+    name: optional modules (Go 1.22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.22.x"
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
+      - name: Test Go 1.22 adapters
+        shell: bash
+        run: |
+          for module in data/gorm web/gin web/fiber web/kratos; do
+            (
+              cd "$module"
+              go mod tidy
+              git diff --exit-code -- go.mod go.sum
+              go vet ./...
+              go test ./...
+              go test -race ./...
+            )
+          done
+
+  optional-go123:
+    name: optional modules (Go 1.23)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.23.x"
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
+      - name: Test Go 1.23 adapters
+        shell: bash
+        run: |
+          for module in data/ent web/echo rpc/grpc obs/otel biz/notification/ses; do
+            (
+              cd "$module"
+              go mod tidy
+              git diff --exit-code -- go.mod go.sum
+              go vet ./...
+              go test ./...
+              go test -race ./...
+            )
+          done
+
+  optional-go124:
+    name: optional modules (Go 1.24)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.x"
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
+      - name: Test Go 1.24 adapters and database contracts
+        shell: bash
+        run: |
+          for module in cache/redis biz/identity/oidc tests/db; do
+            (
+              cd "$module"
+              go mod tidy
+              git diff --exit-code -- go.mod go.sum
+              go vet ./...
+              go test ./...
+              go test -race ./...
+            )
+          done
+
+  examples:
+    name: examples (Go ${{ matrix.go-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - go-version: "1.22.x"
+            modules: "examples/quickstart examples/gin-gorm"
+          - go-version: "1.23.x"
+            modules: "examples/grpc examples/ent"
+          - go-version: "1.24.x"
+            modules: "examples/http-servemux"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
+      - name: Test and run examples
+        shell: bash
+        run: |
+          for module in ${{ matrix.modules }}; do
+            (
+              cd "$module"
+              go mod tidy
+              git diff --exit-code -- go.mod go.sum
+              go test ./...
+              go run .
+            )
+          done
 
   lint:
     name: golangci-lint
@@ -62,8 +173,11 @@ jobs:
         with:
           go-version: "1.26.5"
           cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
 
-      - name: Run golangci-lint
+      - name: Run golangci-lint on the core module
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.9.0
@@ -80,9 +194,19 @@ jobs:
         with:
           go-version: "1.26.5"
           cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
 
-      - name: Run govulncheck
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.5.0 ./...
+      - name: Run govulncheck for every published module
+        shell: bash
+        run: |
+          for module in . data/gorm data/ent web/gin web/echo web/fiber web/kratos rpc/grpc cache/redis obs/otel biz/identity/oidc biz/notification/ses; do
+            (
+              cd "$module"
+              go run golang.org/x/vuln/cmd/govulncheck@v1.5.0 ./...
+            )
+          done
 
   integration:
     name: integration (mysql, postgres, redis)
@@ -95,12 +219,15 @@ jobs:
         with:
           go-version: "1.24.x"
           cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
       - name: Run disposable integration tests with SQL-contract coverage
         shell: pwsh
         run: |
           $sqlContractCoverageProfile = Join-Path $env:RUNNER_TEMP 'saas-sql-contract-coverage.out'
           ./tests/run-integration.ps1 -CoverageProfile $sqlContractCoverageProfile
-          go tool cover "-func=$sqlContractCoverageProfile" | Out-File -FilePath "$sqlContractCoverageProfile.txt" -Encoding utf8
+          go -C tests/coverage tool cover "-func=$sqlContractCoverageProfile" | Out-File -FilePath "$sqlContractCoverageProfile.txt" -Encoding utf8
       - name: Upload SQL-contract coverage artifact
         uses: actions/upload-artifact@v4
         with:
@@ -122,24 +249,20 @@ jobs:
         with:
           go-version: "1.24.x"
           cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
       - name: Download SQL-contract coverage
         uses: actions/download-artifact@v4
         with:
           name: saas-sql-contract-coverage
           path: ${{ runner.temp }}/saas-sql-contract-coverage
-      - name: Generate atomic unit coverage profile
+      - name: Generate merged multi-module coverage profile
         shell: pwsh
         run: |
-          $unitCoverageProfile = Join-Path $env:RUNNER_TEMP 'saas-unit-coverage.out'
-          go test -count=1 -covermode=atomic -coverpkg=./... "-coverprofile=$unitCoverageProfile" ./...
-      - name: Merge unit and SQL-contract coverage
-        shell: pwsh
-        run: |
-          $unitCoverageProfile = Join-Path $env:RUNNER_TEMP 'saas-unit-coverage.out'
-          $sqlContractCoverageDirectory = Join-Path $env:RUNNER_TEMP 'saas-sql-contract-coverage'
-          $sqlContractCoverageProfile = Join-Path $sqlContractCoverageDirectory 'saas-sql-contract-coverage.out'
+          $sqlContractCoverageProfile = Join-Path $env:RUNNER_TEMP 'saas-sql-contract-coverage/saas-sql-contract-coverage.out'
           $coverageProfile = Join-Path $env:RUNNER_TEMP 'saas-coverage.out'
-          ./tests/merge-coverage.ps1 -Profiles @($unitCoverageProfile, $sqlContractCoverageProfile) -Output $coverageProfile
+          ./tests/run-coverage.ps1 -Output $coverageProfile -IntegrationProfile $sqlContractCoverageProfile
       - name: Enforce coverage floor
         shell: pwsh
         run: |
@@ -152,5 +275,5 @@ jobs:
           path: |
             ${{ runner.temp }}/saas-coverage.out
             ${{ runner.temp }}/saas-coverage.out.txt
-            ${{ runner.temp }}/saas-unit-coverage.out
+            ${{ runner.temp }}/saas-module-coverage
           if-no-files-found: error

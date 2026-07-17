@@ -1,4 +1,4 @@
-// Package cache contains tenant-aware cache abstractions.
+// Package cache contains tenant-aware cache abstractions and an in-memory backend.
 //
-// 包 cache 包含具备租户感知能力的缓存抽象。
+// The optional Redis adapter is available from github.com/DarkInno/saas/cache/redis.
 package cache

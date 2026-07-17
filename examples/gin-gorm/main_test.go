@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +19,7 @@ func TestGinGORMExampleRouter(t *testing.T) {
 		t.Fatalf("newDryRunDB() error = %v", err)
 	}
 	tenants := store.NewMemoryStore()
-	if err := tenants.Create(t.Context(), types.Tenant{ID: "tenant-a", Name: "Tenant A", Status: types.TenantStatusActive}); err != nil {
+	if err := tenants.Create(context.Background(), types.Tenant{ID: "tenant-a", Name: "Tenant A", Status: types.TenantStatusActive}); err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 
@@ -55,7 +56,7 @@ func TestGinGORMExampleRouterRejectsInvalidTenantRequests(t *testing.T) {
 		t.Fatalf("newDryRunDB() error = %v", err)
 	}
 	tenants := store.NewMemoryStore()
-	if err := tenants.Create(t.Context(), types.Tenant{ID: "tenant-suspended", Name: "Suspended", Status: types.TenantStatusSuspended}); err != nil {
+	if err := tenants.Create(context.Background(), types.Tenant{ID: "tenant-suspended", Name: "Suspended", Status: types.TenantStatusSuspended}); err != nil {
 		t.Fatalf("Create(suspended) error = %v", err)
 	}
 	router := newRouter(db, tenants)

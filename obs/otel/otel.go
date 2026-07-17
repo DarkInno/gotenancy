@@ -1,10 +1,12 @@
-package obs
+// Package otel adds OpenTelemetry integration to SaaS observability fields.
+package otel
 
 import (
 	"context"
 	"errors"
 	"reflect"
 
+	obs "github.com/DarkInno/saas/obs"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -34,17 +36,19 @@ func NewTracer(provider trace.TracerProvider) trace.Tracer {
 
 // SpanAttributes returns tenant OpenTelemetry span attributes for ctx.
 func SpanAttributes(ctx context.Context) []attribute.KeyValue {
-	tenantID, tenantSide := fieldValues(ctx)
+	fields := obs.Fields(ctx)
+	tenantID := fields[obs.TenantIDField]
+	tenantSide := fields[obs.TenantSideField]
 	if tenantID == "" && tenantSide == "" {
 		return nil
 	}
 
 	attrs := make([]attribute.KeyValue, 0, 2)
 	if tenantID != "" {
-		attrs = append(attrs, attribute.String(TenantIDField, tenantID))
+		attrs = append(attrs, attribute.String(obs.TenantIDField, tenantID))
 	}
 	if tenantSide != "" {
-		attrs = append(attrs, attribute.String(TenantSideField, tenantSide))
+		attrs = append(attrs, attribute.String(obs.TenantSideField, tenantSide))
 	}
 	return attrs
 }

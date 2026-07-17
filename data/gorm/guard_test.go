@@ -1,4 +1,4 @@
-package security_test
+package gormtenant_test
 
 import (
 	"context"

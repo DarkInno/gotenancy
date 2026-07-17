@@ -1,6 +1,6 @@
 //go:build chaos
 
-package cache
+package redis
 
 import (
 	"context"
@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
+	corecache "github.com/DarkInno/saas/cache"
 	tenantctx "github.com/DarkInno/saas/core/context"
 	"github.com/DarkInno/saas/core/types"
 	"github.com/DarkInno/saas/internal/testtoxiproxy"
-	redis "github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 const (
@@ -72,14 +73,14 @@ func TestRedisChaos(t *testing.T) {
 		}
 	})
 
-	redisClient := redis.NewClient(&redis.Options{
+	redisClient := goredis.NewClient(&goredis.Options{
 		Addr:         redisAddress,
 		DialTimeout:  750 * time.Millisecond,
 		ReadTimeout:  750 * time.Millisecond,
 		WriteTimeout: 750 * time.Millisecond,
 		MaxRetries:   -1,
 	})
-	base, err := NewRedis(redisClient)
+	base, err := New(redisClient)
 	if err != nil {
 		t.Fatalf("NewRedis() error = %v", err)
 	}
@@ -97,7 +98,7 @@ func TestRedisChaos(t *testing.T) {
 	tenantB := types.Tenant{ID: types.TenantID("redis-chaos-b-" + suffix)}
 	ctxA := tenantctx.WithTenant(ctx, tenantA)
 	ctxB := tenantctx.WithTenant(ctx, tenantB)
-	scoped := NewTenantCache(base)
+	scoped := corecache.NewTenantCache(base)
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cleanupCancel()
@@ -145,7 +146,7 @@ func TestRedisChaos(t *testing.T) {
 	if err := waitForRedisPing(recoveryCtx, base); err != nil {
 		t.Fatalf("wait for Redis recovery: %v", err)
 	}
-	assertRedisTenantValue(t, NewTenantCache(base), ctxA, ctxB, "recovered", "recovered-a", "recovered-b")
+	assertRedisTenantValue(t, corecache.NewTenantCache(base), ctxA, ctxB, "recovered", "recovered-a", "recovered-b")
 }
 
 func requireChaosEnvironment(t *testing.T, name, expected string) string {
@@ -183,7 +184,7 @@ func waitForRedisPing(ctx context.Context, cache *Redis) error {
 	}
 }
 
-func assertRedisTenantValue(t *testing.T, cache *TenantCache, ctxA, ctxB context.Context, key, valueA, valueB string) {
+func assertRedisTenantValue(t *testing.T, cache *corecache.TenantCache, ctxA, ctxB context.Context, key, valueA, valueB string) {
 	t.Helper()
 	if valueA == valueB {
 		t.Fatalf("test setup for %q does not distinguish tenant values", key)

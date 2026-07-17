@@ -32,7 +32,12 @@ try {
     $env:SAAS_CHAOS_POSTGRES_DSN = 'postgres://saas:saas@127.0.0.1:58667/saas_test?sslmode=disable&connect_timeout=1'
     $env:SAAS_CHAOS_REDIS_ADDR = '127.0.0.1:58668'
 
-    Invoke-Checked go @('test', '-tags=chaos', './cache', '-run', '^TestRedisChaos', '-count=1')
+    Push-Location (Join-Path $repoRoot 'cache/redis')
+    try {
+        Invoke-Checked go @('test', '-tags=chaos', './...', '-run', '^TestRedisChaos', '-count=1')
+    } finally {
+        Pop-Location
+    }
     Push-Location (Join-Path $repoRoot 'tests/db')
     try {
         Invoke-Checked go @('test', '-tags=chaos', './...', '-run', '^TestSQLStoreChaos', '-count=1')

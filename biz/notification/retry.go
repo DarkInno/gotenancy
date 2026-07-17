@@ -91,7 +91,6 @@ func DefaultRetryIf(err error) bool {
 	return !errors.Is(err, ErrInvalidMessage) &&
 		!errors.Is(err, ErrInvalidNotifierConfig) &&
 		!errors.Is(err, ErrInvalidResendConfig) &&
-		!errors.Is(err, ErrInvalidSESConfig) &&
 		!errors.Is(err, ErrInvalidSMTPConfig) &&
 		!errors.Is(err, ErrInvalidWebhookConfig) &&
 		!errors.Is(err, ErrNilNotifier) &&

@@ -25,14 +25,6 @@ func BenchmarkSlogAttrs(b *testing.B) {
 	}
 }
 
-func BenchmarkSpanAttributes(b *testing.B) {
-	ctx := tenantctx.WithTenant(context.Background(), types.Tenant{ID: "tenant-a"})
-	b.ReportAllocs()
-	for range b.N {
-		_ = SpanAttributes(ctx)
-	}
-}
-
 func BenchmarkRedactSlogAttrs(b *testing.B) {
 	attrs := []slog.Attr{
 		slog.String("tenant_id", "tenant-a"),

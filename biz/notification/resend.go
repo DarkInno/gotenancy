@@ -144,7 +144,7 @@ func (notifier *ResendNotifier) SendEmail(ctx context.Context, message Message) 
 	}
 	response, err := notifier.client.Do(request)
 	if err != nil {
-		return ResendResult{}, err
+		return ResendResult{}, normalizeHTTPError(ctx, err)
 	}
 	defer func() {
 		_ = response.Body.Close()

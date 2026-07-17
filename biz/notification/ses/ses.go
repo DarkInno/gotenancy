@@ -1,4 +1,4 @@
-package notification
+package ses
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"net/mail"
 	"strings"
 
+	"github.com/DarkInno/saas/biz/notification"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
 	"github.com/aws/smithy-go"
@@ -18,14 +19,14 @@ const (
 	defaultSESTagValueLimit = 256
 )
 
-// SESBodyFormat controls how Message.Body is mapped to Amazon SES.
+// SESBodyFormat controls how notification.Message.Body is mapped to Amazon SES.
 type SESBodyFormat string
 
 const (
-	// SESBodyText sends Message.Body as the text body.
+	// SESBodyText sends notification.Message.Body as the text body.
 	SESBodyText SESBodyFormat = "text"
 
-	// SESBodyHTML sends Message.Body as the HTML body.
+	// SESBodyHTML sends notification.Message.Body as the HTML body.
 	SESBodyHTML SESBodyFormat = "html"
 )
 
@@ -93,7 +94,7 @@ type SESNotifier struct {
 	replyToAddresses     []string
 }
 
-var _ Notifier = (*SESNotifier)(nil)
+var _ notification.Notifier = (*SESNotifier)(nil)
 
 // NewSESNotifier creates an Amazon SES-backed email notifier.
 func NewSESNotifier(config SESConfig) (*SESNotifier, error) {
@@ -123,18 +124,18 @@ func NewSESNotifier(config SESConfig) (*SESNotifier, error) {
 }
 
 // Send sends message through Amazon SES and discards the returned provider ID.
-func (notifier *SESNotifier) Send(ctx context.Context, message Message) error {
+func (notifier *SESNotifier) Send(ctx context.Context, message notification.Message) error {
 	_, err := notifier.SendEmail(ctx, message)
 	return err
 }
 
 // SendEmail sends message through Amazon SES and returns the provider ID.
-func (notifier *SESNotifier) SendEmail(ctx context.Context, message Message) (SESResult, error) {
+func (notifier *SESNotifier) SendEmail(ctx context.Context, message notification.Message) (SESResult, error) {
 	if err := ctx.Err(); err != nil {
 		return SESResult{}, err
 	}
 	if notifier == nil {
-		return SESResult{}, ErrNilNotifier
+		return SESResult{}, notification.ErrNilNotifier
 	}
 	if err := validateSESMessage(notifier.channel, message); err != nil {
 		return SESResult{}, err
@@ -158,10 +159,10 @@ func (notifier *SESNotifier) SendEmail(ctx context.Context, message Message) (SE
 	return SESResult{MessageID: messageID}, nil
 }
 
-func (notifier *SESNotifier) input(message Message) (*sesv2.SendEmailInput, error) {
+func (notifier *SESNotifier) input(message notification.Message) (*sesv2.SendEmailInput, error) {
 	recipients, err := parseAddressList(message.To)
 	if err != nil {
-		return nil, ErrInvalidMessage
+		return nil, notification.ErrInvalidMessage
 	}
 	tags, err := sesTags(message.Tags)
 	if err != nil {
@@ -206,7 +207,7 @@ func normalizeSESConfig(config SESConfig) SESConfig {
 	config.ConfigurationSetName = strings.TrimSpace(config.ConfigurationSetName)
 	config.TenantName = strings.TrimSpace(config.TenantName)
 	if config.Channel == "" {
-		config.Channel = ChannelEmail
+		config.Channel = notification.ChannelEmail
 	}
 	if config.BodyFormat == "" {
 		config.BodyFormat = SESBodyText
@@ -244,22 +245,22 @@ func validateSESConfig(config SESConfig) error {
 	return nil
 }
 
-func validateSESMessage(channel string, message Message) error {
+func validateSESMessage(channel string, message notification.Message) error {
 	if err := message.Validate(); err != nil {
 		return err
 	}
 	if message.Channel != channel {
-		return ErrUnsupportedChannel
+		return notification.ErrUnsupportedChannel
 	}
 	if strings.TrimSpace(message.Subject) == "" || strings.TrimSpace(message.Body) == "" {
-		return ErrInvalidMessage
+		return notification.ErrInvalidMessage
 	}
 	if hasHeaderInjection(message.To) || hasHeaderInjection(message.Subject) {
-		return ErrInvalidMessage
+		return notification.ErrInvalidMessage
 	}
 	recipients, err := parseAddressList(message.To)
 	if err != nil || !validSESAddresses(recipients) {
-		return ErrInvalidMessage
+		return notification.ErrInvalidMessage
 	}
 	if _, err := sesTags(message.Tags); err != nil {
 		return err
@@ -275,7 +276,7 @@ func sesTags(metadata map[string]string) ([]types.MessageTag, error) {
 	tags := make([]types.MessageTag, 0, len(metadata))
 	for key, value := range metadata {
 		if !validTagValue(key, defaultSESTagNameLimit) || !validTagValue(value, defaultSESTagValueLimit) {
-			return nil, ErrInvalidMessage
+			return nil, notification.ErrInvalidMessage
 		}
 		tags = append(tags, types.MessageTag{Name: stringPtr(key), Value: stringPtr(value)})
 	}
@@ -312,7 +313,7 @@ func isSESThrottle(code string) bool {
 func formatSESAddress(value string) (string, error) {
 	address, err := parseSingleAddress(value)
 	if err != nil || !validSESAddress(address) {
-		return "", ErrInvalidMessage
+		return "", notification.ErrInvalidMessage
 	}
 	if address.Name == "" {
 		return address.Address, nil
@@ -363,4 +364,55 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func parseSingleAddress(value string) (*mail.Address, error) {
+	address, err := mail.ParseAddress(value)
+	if err != nil {
+		return nil, err
+	}
+	if address.Address == "" {
+		return nil, notification.ErrInvalidMessage
+	}
+	return address, nil
+}
+
+func parseAddressList(value string) ([]*mail.Address, error) {
+	addresses, err := mail.ParseAddressList(value)
+	if err != nil {
+		return nil, err
+	}
+	if len(addresses) == 0 {
+		return nil, notification.ErrInvalidMessage
+	}
+	return addresses, nil
+}
+
+func addressStrings(addresses []*mail.Address) []string {
+	values := make([]string, len(addresses))
+	for i, address := range addresses {
+		if address.Name == "" {
+			values[i] = address.Address
+			continue
+		}
+		values[i] = address.String()
+	}
+	return values
+}
+
+func hasHeaderInjection(value string) bool {
+	return strings.ContainsAny(value, "\r\n")
+}
+
+func validTagValue(value string, limit int) bool {
+	if value == "" || len(value) > limit {
+		return false
+	}
+	for _, r := range value {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '-' {
+			continue
+		}
+		return false
+	}
+	return true
 }

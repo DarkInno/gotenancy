@@ -1,4 +1,4 @@
-package notification
+package ses
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DarkInno/saas/biz/notification"
+	"github.com/DarkInno/saas/core/types"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/smithy-go"
 )
@@ -22,7 +24,7 @@ func TestSESNotifierSendEmail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSESNotifier() error = %v", err)
 	}
-	message := testMessage(ChannelEmail)
+	message := testMessage(notification.ChannelEmail)
 	message.Body = "welcome"
 	message.Metadata = map[string]string{"trace.id": "internal-only"}
 	message.Tags = map[string]string{"tenant": "tenant-a"}
@@ -67,7 +69,7 @@ func TestSESNotifierEncodesFriendlyFromName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSESNotifier() error = %v", err)
 	}
-	message := testMessage(ChannelEmail)
+	message := testMessage(notification.ChannelEmail)
 	message.Body = "welcome"
 
 	if _, err := notifier.SendEmail(context.Background(), message); err != nil {
@@ -85,7 +87,7 @@ func TestSESNotifierHTMLBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSESNotifier() error = %v", err)
 	}
-	message := testMessage(ChannelEmail)
+	message := testMessage(notification.ChannelEmail)
 	message.Body = "<p>welcome</p>"
 	if err := notifier.Send(context.Background(), message); err != nil {
 		t.Fatalf("Send() error = %v", err)
@@ -112,8 +114,8 @@ func TestSESNotifierValidation(t *testing.T) {
 	if _, err := NewSESNotifier(SESConfig{Sender: &fakeSESSender{}, From: "noreply@example.com", BodyFormat: "raw"}); !errors.Is(err, ErrInvalidSESConfig) {
 		t.Fatalf("NewSESNotifier(bad body format) error = %v, want ErrInvalidSESConfig", err)
 	}
-	if err := (*SESNotifier)(nil).Send(context.Background(), testMessage(ChannelEmail)); !errors.Is(err, ErrNilNotifier) {
-		t.Fatalf("nil Send() error = %v, want ErrNilNotifier", err)
+	if err := (*SESNotifier)(nil).Send(context.Background(), testMessage(notification.ChannelEmail)); !errors.Is(err, notification.ErrNilNotifier) {
+		t.Fatalf("nil Send() error = %v, want notification.ErrNilNotifier", err)
 	}
 }
 
@@ -124,23 +126,23 @@ func TestSESNotifierMessageValidation(t *testing.T) {
 	}
 	message := testMessage("sms")
 	message.Body = "body"
-	if _, err := notifier.SendEmail(context.Background(), message); !errors.Is(err, ErrUnsupportedChannel) {
-		t.Fatalf("SendEmail(wrong channel) error = %v, want ErrUnsupportedChannel", err)
+	if _, err := notifier.SendEmail(context.Background(), message); !errors.Is(err, notification.ErrUnsupportedChannel) {
+		t.Fatalf("SendEmail(wrong channel) error = %v, want notification.ErrUnsupportedChannel", err)
 	}
-	message = testMessage(ChannelEmail)
+	message = testMessage(notification.ChannelEmail)
 	message.Body = ""
-	if _, err := notifier.SendEmail(context.Background(), message); !errors.Is(err, ErrInvalidMessage) {
-		t.Fatalf("SendEmail(empty body) error = %v, want ErrInvalidMessage", err)
+	if _, err := notifier.SendEmail(context.Background(), message); !errors.Is(err, notification.ErrInvalidMessage) {
+		t.Fatalf("SendEmail(empty body) error = %v, want notification.ErrInvalidMessage", err)
 	}
 	message.Body = "body"
 	message.Tags = map[string]string{"bad key": "value"}
-	if _, err := notifier.SendEmail(context.Background(), message); !errors.Is(err, ErrInvalidMessage) {
-		t.Fatalf("SendEmail(bad tags) error = %v, want ErrInvalidMessage", err)
+	if _, err := notifier.SendEmail(context.Background(), message); !errors.Is(err, notification.ErrInvalidMessage) {
+		t.Fatalf("SendEmail(bad tags) error = %v, want notification.ErrInvalidMessage", err)
 	}
 	message.Tags = nil
 	message.To = "user@ex\u00e4mple.com"
-	if _, err := notifier.SendEmail(context.Background(), message); !errors.Is(err, ErrInvalidMessage) {
-		t.Fatalf("SendEmail(non-ascii recipient) error = %v, want ErrInvalidMessage", err)
+	if _, err := notifier.SendEmail(context.Background(), message); !errors.Is(err, notification.ErrInvalidMessage) {
+		t.Fatalf("SendEmail(non-ascii recipient) error = %v, want notification.ErrInvalidMessage", err)
 	}
 }
 
@@ -150,7 +152,7 @@ func TestSESNotifierDoesNotMapMetadataToTags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSESNotifier() error = %v", err)
 	}
-	message := testMessage(ChannelEmail)
+	message := testMessage(notification.ChannelEmail)
 	message.Body = "welcome"
 	message.Metadata = map[string]string{"trace.id": "internal-only"}
 
@@ -167,7 +169,7 @@ func TestSESNotifierRejectsEmptyProviderID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSESNotifier() error = %v", err)
 	}
-	message := testMessage(ChannelEmail)
+	message := testMessage(notification.ChannelEmail)
 	message.Body = "body"
 
 	_, err = notifier.SendEmail(context.Background(), message)
@@ -212,7 +214,7 @@ func TestSESNotifierClassifiesErrors(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewSESNotifier() error = %v", err)
 			}
-			message := testMessage(ChannelEmail)
+			message := testMessage(notification.ChannelEmail)
 			message.Body = "body"
 			_, err = notifier.SendEmail(context.Background(), message)
 			if !errors.Is(err, ErrSESDelivery) {
@@ -222,8 +224,8 @@ func TestSESNotifierClassifiesErrors(t *testing.T) {
 			if !errors.As(err, &deliveryErr) {
 				t.Fatalf("SendEmail() error = %v, want SESDeliveryError", err)
 			}
-			if deliveryErr.Retryable() != tt.retryable || DefaultRetryIf(err) != tt.retryable {
-				t.Fatalf("retryable = %v default = %v, want %v", deliveryErr.Retryable(), DefaultRetryIf(err), tt.retryable)
+			if deliveryErr.Retryable() != tt.retryable || notification.DefaultRetryIf(err) != tt.retryable {
+				t.Fatalf("retryable = %v default = %v, want %v", deliveryErr.Retryable(), notification.DefaultRetryIf(err), tt.retryable)
 			}
 			if strings.Contains(err.Error(), "bad address") || strings.Contains(err.Error(), "rate limit") {
 				t.Fatalf("error string %q leaked provider message", err.Error())
@@ -237,7 +239,7 @@ func TestSESNotifierPreservesContextErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSESNotifier() error = %v", err)
 	}
-	message := testMessage(ChannelEmail)
+	message := testMessage(notification.ChannelEmail)
 	message.Body = "body"
 	_, err = notifier.SendEmail(context.Background(), message)
 	if !errors.Is(err, context.Canceled) {
@@ -263,4 +265,13 @@ func (sender *fakeSESSender) SendEmail(ctx context.Context, params *sesv2.SendEm
 		return sender.output, nil
 	}
 	return &sesv2.SendEmailOutput{}, nil
+}
+
+func testMessage(channel string) notification.Message {
+	return notification.Message{
+		TenantID: types.TenantID("tenant-a"),
+		Channel:  channel,
+		To:       "user@example.com",
+		Subject:  "Hi",
+	}
 }

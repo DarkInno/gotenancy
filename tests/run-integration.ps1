@@ -47,7 +47,12 @@ try {
     $env:SAAS_REDIS_DB = '15'
     Remove-Item -Path Env:SAAS_REDIS_PASSWORD -ErrorAction SilentlyContinue
 
-    Invoke-Checked go @('test', './data/gorm', '-run', '^TestMySQLIntegrationEnforcesTenantIsolation$', '-count=1')
+    Push-Location (Join-Path $repoRoot 'data/gorm')
+    try {
+        Invoke-Checked go @('test', './...', '-run', '^TestMySQLIntegrationEnforcesTenantIsolation$', '-count=1')
+    } finally {
+        Pop-Location
+    }
     Push-Location (Join-Path $repoRoot 'tests/db')
     try {
         $databaseTestArguments = @('test', './...', '-run', '^Test(AuditSQLStore|SQLStore|QuotaSQLStore|RBACAndUserSQLStore|IdentitySQLStore|OIDCSQLLoginStore|FeatureSQLStore|PlanSQLStore|SubscriptionSQLStore)(MySQL|Postgres)Integration$', '-count=1')
@@ -58,7 +63,12 @@ try {
     } finally {
         Pop-Location
     }
-    Invoke-Checked go @('test', './cache', '-run', '^TestRedisCacheIntegration$', '-count=1')
+    Push-Location (Join-Path $repoRoot 'cache/redis')
+    try {
+        Invoke-Checked go @('test', './...', '-run', '^TestRedisCacheIntegration$', '-count=1')
+    } finally {
+        Pop-Location
+    }
 } catch {
     & docker compose -f $composeFile logs --no-color
     throw

@@ -1,4 +1,4 @@
-package cache
+package redis
 
 import (
 	"context"
@@ -8,22 +8,22 @@ import (
 	"testing"
 	"time"
 
-	redis "github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 func TestRedisCacheSetGetDelete(t *testing.T) {
 	client := &fakeRedisClient{
-		getFunc: func(context.Context, string) *redis.StringCmd {
-			return redis.NewStringResult("value", nil)
+		getFunc: func(context.Context, string) *goredis.StringCmd {
+			return goredis.NewStringResult("value", nil)
 		},
-		setFunc: func(context.Context, string, interface{}, time.Duration) *redis.StatusCmd {
-			return redis.NewStatusResult("OK", nil)
+		setFunc: func(context.Context, string, interface{}, time.Duration) *goredis.StatusCmd {
+			return goredis.NewStatusResult("OK", nil)
 		},
-		delFunc: func(context.Context, ...string) *redis.IntCmd {
-			return redis.NewIntResult(1, nil)
+		delFunc: func(context.Context, ...string) *goredis.IntCmd {
+			return goredis.NewIntResult(1, nil)
 		},
 	}
-	cache, err := NewRedis(client)
+	cache, err := New(client)
 	if err != nil {
 		t.Fatalf("NewRedis() error = %v", err)
 	}
@@ -63,11 +63,11 @@ func TestRedisCacheSetGetDelete(t *testing.T) {
 
 func TestRedisCacheMissMapsRedisNil(t *testing.T) {
 	client := &fakeRedisClient{
-		getFunc: func(context.Context, string) *redis.StringCmd {
-			return redis.NewStringResult("", redis.Nil)
+		getFunc: func(context.Context, string) *goredis.StringCmd {
+			return goredis.NewStringResult("", goredis.Nil)
 		},
 	}
-	cache, err := NewRedis(client)
+	cache, err := New(client)
 	if err != nil {
 		t.Fatalf("NewRedis() error = %v", err)
 	}
@@ -84,23 +84,23 @@ func TestRedisCacheMissMapsRedisNil(t *testing.T) {
 func TestRedisCachePropagatesCommandErrors(t *testing.T) {
 	down := errors.New("redis down")
 	client := &fakeRedisClient{
-		getFunc: func(context.Context, string) *redis.StringCmd {
-			return redis.NewStringResult("", down)
+		getFunc: func(context.Context, string) *goredis.StringCmd {
+			return goredis.NewStringResult("", down)
 		},
-		setFunc: func(context.Context, string, interface{}, time.Duration) *redis.StatusCmd {
-			return redis.NewStatusResult("", down)
+		setFunc: func(context.Context, string, interface{}, time.Duration) *goredis.StatusCmd {
+			return goredis.NewStatusResult("", down)
 		},
-		delFunc: func(context.Context, ...string) *redis.IntCmd {
-			return redis.NewIntResult(0, down)
+		delFunc: func(context.Context, ...string) *goredis.IntCmd {
+			return goredis.NewIntResult(0, down)
 		},
-		pingFunc: func(context.Context) *redis.StatusCmd {
-			return redis.NewStatusResult("", down)
+		pingFunc: func(context.Context) *goredis.StatusCmd {
+			return goredis.NewStatusResult("", down)
 		},
 		closeFunc: func() error {
 			return down
 		},
 	}
-	cache, err := NewRedis(client)
+	cache, err := New(client)
 	if err != nil {
 		t.Fatalf("NewRedis() error = %v", err)
 	}
@@ -124,7 +124,7 @@ func TestRedisCachePropagatesCommandErrors(t *testing.T) {
 
 func TestRedisCacheContextCancellationDoesNotCallClient(t *testing.T) {
 	client := &fakeRedisClient{}
-	cache, err := NewRedis(client)
+	cache, err := New(client)
 	if err != nil {
 		t.Fatalf("NewRedis() error = %v", err)
 	}
@@ -150,11 +150,11 @@ func TestRedisCacheContextCancellationDoesNotCallClient(t *testing.T) {
 
 func TestRedisCachePing(t *testing.T) {
 	client := &fakeRedisClient{
-		pingFunc: func(context.Context) *redis.StatusCmd {
-			return redis.NewStatusResult("PONG", nil)
+		pingFunc: func(context.Context) *goredis.StatusCmd {
+			return goredis.NewStatusResult("PONG", nil)
 		},
 	}
-	cache, err := NewRedis(client)
+	cache, err := New(client)
 	if err != nil {
 		t.Fatalf("NewRedis() error = %v", err)
 	}
@@ -168,7 +168,7 @@ func TestRedisCachePing(t *testing.T) {
 }
 
 func TestRedisCachePingRequiresPinger(t *testing.T) {
-	cache, err := NewRedis(redisClientWithoutPing{})
+	cache, err := New(redisClientWithoutPing{})
 	if err != nil {
 		t.Fatalf("NewRedis() error = %v", err)
 	}
@@ -179,20 +179,74 @@ func TestRedisCachePingRequiresPinger(t *testing.T) {
 }
 
 func TestRedisCacheInvalidConfig(t *testing.T) {
-	if _, err := NewRedis(nil); !errors.Is(err, ErrInvalidRedisConfig) {
-		t.Fatalf("NewRedis(nil) error = %v, want ErrInvalidRedisConfig", err)
+	if _, err := New(nil); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("New(nil) error = %v, want ErrInvalidRedisConfig", err)
 	}
-	if _, err := NewRedisFromOptions(nil); !errors.Is(err, ErrInvalidRedisConfig) {
-		t.Fatalf("NewRedisFromOptions(nil) error = %v, want ErrInvalidRedisConfig", err)
+	if _, err := NewFromOptions(nil); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("NewFromOptions(nil) error = %v, want ErrInvalidRedisConfig", err)
 	}
-	if _, err := NewRedisFromClusterOptions(nil); !errors.Is(err, ErrInvalidRedisConfig) {
-		t.Fatalf("NewRedisFromClusterOptions(nil) error = %v, want ErrInvalidRedisConfig", err)
+	if _, err := NewFromClusterOptions(nil); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("NewFromClusterOptions(nil) error = %v, want ErrInvalidRedisConfig", err)
 	}
-	if _, err := NewRedisFromURL(""); !errors.Is(err, ErrInvalidRedisConfig) {
-		t.Fatalf("NewRedisFromURL(empty) error = %v, want ErrInvalidRedisConfig", err)
+	if _, err := NewFromURL(""); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("NewFromURL(empty) error = %v, want ErrInvalidRedisConfig", err)
 	}
-	if _, err := NewRedisFromURL("://bad"); !errors.Is(err, ErrInvalidRedisConfig) {
-		t.Fatalf("NewRedisFromURL(invalid) error = %v, want ErrInvalidRedisConfig", err)
+	if _, err := NewFromURL("://bad"); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("NewFromURL(invalid) error = %v, want ErrInvalidRedisConfig", err)
+	}
+}
+
+func TestRedisCacheRejectsNilAdapterAndNilCommands(t *testing.T) {
+	var nilCache *Redis
+	if _, _, err := nilCache.Get(context.Background(), "key"); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("nil Get() error = %v, want ErrInvalidRedisConfig", err)
+	}
+	if err := nilCache.Set(context.Background(), "key", []byte("value"), 0); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("nil Set() error = %v, want ErrInvalidRedisConfig", err)
+	}
+	if err := nilCache.Delete(context.Background(), "key"); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("nil Delete() error = %v, want ErrInvalidRedisConfig", err)
+	}
+	if err := nilCache.Ping(context.Background()); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("nil Ping() error = %v, want ErrInvalidRedisConfig", err)
+	}
+	if err := nilCache.Close(); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("nil Close() error = %v, want ErrInvalidRedisConfig", err)
+	}
+
+	cache, err := New(&fakeRedisClient{
+		getFunc:  func(context.Context, string) *goredis.StringCmd { return nil },
+		setFunc:  func(context.Context, string, interface{}, time.Duration) *goredis.StatusCmd { return nil },
+		delFunc:  func(context.Context, ...string) *goredis.IntCmd { return nil },
+		pingFunc: func(context.Context) *goredis.StatusCmd { return nil },
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	if _, _, err := cache.Get(context.Background(), "key"); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("Get(nil command) error = %v, want ErrInvalidRedisConfig", err)
+	}
+	if err := cache.Set(context.Background(), "key", []byte("value"), 0); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("Set(nil command) error = %v, want ErrInvalidRedisConfig", err)
+	}
+	if err := cache.Delete(context.Background(), "key"); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("Delete(nil command) error = %v, want ErrInvalidRedisConfig", err)
+	}
+	if err := cache.Ping(context.Background()); !errors.Is(err, ErrInvalidRedisConfig) {
+		t.Fatalf("Ping(nil command) error = %v, want ErrInvalidRedisConfig", err)
+	}
+}
+
+func TestCloneBytesPreservesNilAndIsolation(t *testing.T) {
+	if cloneBytes(nil) != nil {
+		t.Fatal("cloneBytes(nil) must remain nil")
+	}
+
+	original := []byte("value")
+	cloned := cloneBytes(original)
+	cloned[0] = 'x'
+	if string(original) != "value" {
+		t.Fatalf("cloneBytes() mutated original: %q", original)
 	}
 }
 
@@ -202,7 +256,7 @@ func TestNewRedisFromURLDoesNotLeakCredentialsOnParseFailure(t *testing.T) {
 		password = "super-secret"
 	)
 
-	_, err := NewRedisFromURL(rawURL)
+	_, err := NewFromURL(rawURL)
 	if !errors.Is(err, ErrInvalidRedisConfig) {
 		t.Fatalf("NewRedisFromURL() error = %v, want ErrInvalidRedisConfig", err)
 	}
@@ -212,7 +266,7 @@ func TestNewRedisFromURLDoesNotLeakCredentialsOnParseFailure(t *testing.T) {
 }
 
 func TestRedisCacheConstructors(t *testing.T) {
-	cache, err := NewRedisFromOptions(&redis.Options{Addr: "127.0.0.1:0"})
+	cache, err := NewFromOptions(&goredis.Options{Addr: "127.0.0.1:0"})
 	if err != nil {
 		t.Fatalf("NewRedisFromOptions() error = %v", err)
 	}
@@ -220,7 +274,7 @@ func TestRedisCacheConstructors(t *testing.T) {
 		t.Fatalf("Close(options cache) error = %v", err)
 	}
 
-	cache, err = NewRedisFromClusterOptions(&redis.ClusterOptions{Addrs: []string{"127.0.0.1:0"}})
+	cache, err = NewFromClusterOptions(&goredis.ClusterOptions{Addrs: []string{"127.0.0.1:0"}})
 	if err != nil {
 		t.Fatalf("NewRedisFromClusterOptions() error = %v", err)
 	}
@@ -228,7 +282,7 @@ func TestRedisCacheConstructors(t *testing.T) {
 		t.Fatalf("Close(cluster cache) error = %v", err)
 	}
 
-	cache, err = NewRedisFromURL("redis://localhost:6379/0")
+	cache, err = NewFromURL("redis://localhost:6379/0")
 	if err != nil {
 		t.Fatalf("NewRedisFromURL() error = %v", err)
 	}
@@ -238,10 +292,10 @@ func TestRedisCacheConstructors(t *testing.T) {
 }
 
 type fakeRedisClient struct {
-	getFunc   func(context.Context, string) *redis.StringCmd
-	setFunc   func(context.Context, string, interface{}, time.Duration) *redis.StatusCmd
-	delFunc   func(context.Context, ...string) *redis.IntCmd
-	pingFunc  func(context.Context) *redis.StatusCmd
+	getFunc   func(context.Context, string) *goredis.StringCmd
+	setFunc   func(context.Context, string, interface{}, time.Duration) *goredis.StatusCmd
+	delFunc   func(context.Context, ...string) *goredis.IntCmd
+	pingFunc  func(context.Context) *goredis.StatusCmd
 	closeFunc func() error
 
 	getCalled  bool
@@ -255,15 +309,15 @@ type fakeRedisClient struct {
 	delKeys  []string
 }
 
-func (client *fakeRedisClient) Get(ctx context.Context, key string) *redis.StringCmd {
+func (client *fakeRedisClient) Get(ctx context.Context, key string) *goredis.StringCmd {
 	client.getCalled = true
 	if client.getFunc != nil {
 		return client.getFunc(ctx, key)
 	}
-	return redis.NewStringResult("", nil)
+	return goredis.NewStringResult("", nil)
 }
 
-func (client *fakeRedisClient) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd {
+func (client *fakeRedisClient) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *goredis.StatusCmd {
 	client.setCalled = true
 	client.setKey = key
 	client.setTTL = expiration
@@ -273,24 +327,24 @@ func (client *fakeRedisClient) Set(ctx context.Context, key string, value interf
 	if client.setFunc != nil {
 		return client.setFunc(ctx, key, value, expiration)
 	}
-	return redis.NewStatusResult("OK", nil)
+	return goredis.NewStatusResult("OK", nil)
 }
 
-func (client *fakeRedisClient) Del(ctx context.Context, keys ...string) *redis.IntCmd {
+func (client *fakeRedisClient) Del(ctx context.Context, keys ...string) *goredis.IntCmd {
 	client.delCalled = true
 	client.delKeys = append([]string(nil), keys...)
 	if client.delFunc != nil {
 		return client.delFunc(ctx, keys...)
 	}
-	return redis.NewIntResult(int64(len(keys)), nil)
+	return goredis.NewIntResult(int64(len(keys)), nil)
 }
 
-func (client *fakeRedisClient) Ping(ctx context.Context) *redis.StatusCmd {
+func (client *fakeRedisClient) Ping(ctx context.Context) *goredis.StatusCmd {
 	client.pingCalled = true
 	if client.pingFunc != nil {
 		return client.pingFunc(ctx)
 	}
-	return redis.NewStatusResult("PONG", nil)
+	return goredis.NewStatusResult("PONG", nil)
 }
 
 func (client *fakeRedisClient) Close() error {
@@ -302,16 +356,16 @@ func (client *fakeRedisClient) Close() error {
 
 type redisClientWithoutPing struct{}
 
-func (redisClientWithoutPing) Get(context.Context, string) *redis.StringCmd {
-	return redis.NewStringResult("", nil)
+func (redisClientWithoutPing) Get(context.Context, string) *goredis.StringCmd {
+	return goredis.NewStringResult("", nil)
 }
 
-func (redisClientWithoutPing) Set(context.Context, string, interface{}, time.Duration) *redis.StatusCmd {
-	return redis.NewStatusResult("OK", nil)
+func (redisClientWithoutPing) Set(context.Context, string, interface{}, time.Duration) *goredis.StatusCmd {
+	return goredis.NewStatusResult("OK", nil)
 }
 
-func (redisClientWithoutPing) Del(context.Context, ...string) *redis.IntCmd {
-	return redis.NewIntResult(0, nil)
+func (redisClientWithoutPing) Del(context.Context, ...string) *goredis.IntCmd {
+	return goredis.NewIntResult(0, nil)
 }
 
 func (redisClientWithoutPing) Close() error {

@@ -9,11 +9,6 @@ import (
 
 	tenantctx "github.com/DarkInno/saas/core/context"
 	"github.com/DarkInno/saas/core/types"
-
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
 func TestFields(t *testing.T) {
@@ -120,122 +115,6 @@ func TestLoggerWithTenant(t *testing.T) {
 	if record[TenantIDField] != "tenant-a" || record[TenantSideField] != tenantSide {
 		t.Fatalf("LoggerWithTenant() record = %#v", record)
 	}
-}
-
-func TestSpanAttributes(t *testing.T) {
-	ctx := tenantctx.WithTenant(context.Background(), types.Tenant{ID: "tenant-a"})
-	attrs := SpanAttributes(ctx)
-	assertAttribute(t, attrs, TenantIDField, "tenant-a")
-	assertAttribute(t, attrs, TenantSideField, tenantSide)
-}
-
-func TestAddSpanAttributes(t *testing.T) {
-	span := &recordingSpan{recording: true}
-	ctx := tenantctx.WithTenant(context.Background(), types.Tenant{ID: "tenant-a"})
-	ctx = trace.ContextWithSpan(ctx, span)
-
-	AddSpanAttributes(ctx)
-
-	assertAttribute(t, span.attrs, TenantIDField, "tenant-a")
-	assertAttribute(t, span.attrs, TenantSideField, tenantSide)
-}
-
-func TestStartSpanAddsTenantAttributes(t *testing.T) {
-	tracer := &recordingTracer{}
-	ctx := tenantctx.WithTenant(context.Background(), types.Tenant{ID: "tenant-a"})
-
-	_, span := StartSpan(ctx, tracer, "tenant.operation")
-	span.End()
-
-	if tracer.name != "tenant.operation" {
-		t.Fatalf("StartSpan() name = %q, want tenant.operation", tracer.name)
-	}
-	config := trace.NewSpanStartConfig(tracer.opts...)
-	assertAttribute(t, config.Attributes(), TenantIDField, "tenant-a")
-	assertAttribute(t, config.Attributes(), TenantSideField, tenantSide)
-}
-
-func TestRecordSpanError(t *testing.T) {
-	span := &recordingSpan{recording: true}
-	ctx := trace.ContextWithSpan(context.Background(), span)
-	err := sensitiveTestError{}
-
-	RecordSpanError(ctx, err, "")
-
-	if span.err == nil || span.err.Error() != defaultErrorDescription {
-		t.Fatalf("RecordSpanError() err = %v, want sanitized default description", span.err)
-	}
-	if span.err.Error() == err.Error() {
-		t.Fatalf("RecordSpanError() recorded raw error text")
-	}
-	if span.status != codes.Error || span.statusDescription != defaultErrorDescription {
-		t.Fatalf("RecordSpanError() status = %v %q, want error default description", span.status, span.statusDescription)
-	}
-	assertAttribute(t, span.eventAttrs, errorTypeAttribute, "obs.sensitiveTestError")
-}
-
-func assertAttribute(t *testing.T, attrs []attribute.KeyValue, key, value string) {
-	t.Helper()
-	for _, attr := range attrs {
-		if string(attr.Key) == key {
-			if attr.Value.AsString() != value {
-				t.Fatalf("attribute %s = %q, want %q", key, attr.Value.AsString(), value)
-			}
-			return
-		}
-	}
-	t.Fatalf("attribute %s missing in %#v", key, attrs)
-}
-
-type recordingTracer struct {
-	noop.Tracer
-
-	name string
-	opts []trace.SpanStartOption
-	span *recordingSpan
-}
-
-func (tracer *recordingTracer) Start(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	tracer.name = name
-	tracer.opts = append([]trace.SpanStartOption(nil), opts...)
-	tracer.span = &recordingSpan{recording: true}
-	return trace.ContextWithSpan(ctx, tracer.span), tracer.span
-}
-
-type recordingSpan struct {
-	noop.Span
-
-	recording         bool
-	attrs             []attribute.KeyValue
-	eventAttrs        []attribute.KeyValue
-	err               error
-	status            codes.Code
-	statusDescription string
-}
-
-func (span *recordingSpan) IsRecording() bool {
-	return span.recording
-}
-
-func (span *recordingSpan) SetAttributes(attrs ...attribute.KeyValue) {
-	span.attrs = append(span.attrs, attrs...)
-}
-
-func (span *recordingSpan) RecordError(err error, opts ...trace.EventOption) {
-	span.err = err
-	config := trace.NewEventConfig(opts...)
-	span.eventAttrs = append(span.eventAttrs, config.Attributes()...)
-}
-
-func (span *recordingSpan) SetStatus(code codes.Code, description string) {
-	span.status = code
-	span.statusDescription = description
-}
-
-type sensitiveTestError struct{}
-
-func (sensitiveTestError) Error() string {
-	return "password=secret"
 }
 
 type sensitiveLogValue struct{}

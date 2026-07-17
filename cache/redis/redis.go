@@ -1,71 +1,80 @@
-package cache
+// Package redis adapts github.com/redis/go-redis/v9 clients to SaaS cache.Cache.
+//
+// 包 redis 将 github.com/redis/go-redis/v9 客户端适配为 SaaS cache.Cache。
+package redis
 
 import (
 	"context"
 	"errors"
 	"time"
 
-	redis "github.com/redis/go-redis/v9"
+	corecache "github.com/DarkInno/saas/cache"
+	goredis "github.com/redis/go-redis/v9"
 )
 
-var _ Cache = (*Redis)(nil)
+var _ corecache.Cache = (*Redis)(nil)
 
-// RedisClient is the subset of go-redis used by the cache adapter.
-type RedisClient interface {
-	Get(ctx context.Context, key string) *redis.StringCmd
-	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
-	Del(ctx context.Context, keys ...string) *redis.IntCmd
+// ErrInvalidRedisConfig reports an invalid Redis adapter configuration.
+// It aliases the core cache sentinel so callers can use errors.Is across the
+// core and optional Redis modules.
+var ErrInvalidRedisConfig = corecache.ErrInvalidRedisConfig
+
+// Client is the subset of go-redis used by the cache adapter.
+type Client interface {
+	Get(ctx context.Context, key string) *goredis.StringCmd
+	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *goredis.StatusCmd
+	Del(ctx context.Context, keys ...string) *goredis.IntCmd
 	Close() error
 }
 
-// RedisPinger is implemented by go-redis clients that support PING health checks.
-type RedisPinger interface {
-	Ping(ctx context.Context) *redis.StatusCmd
+// Pinger is implemented by go-redis clients that support PING health checks.
+type Pinger interface {
+	Ping(ctx context.Context) *goredis.StatusCmd
 }
 
-// Redis stores cache values in Redis through a go-redis client.
+// Redis stores cache values through a go-redis client.
 type Redis struct {
-	client RedisClient
+	client Client
 }
 
-// NewRedis creates a cache adapter from an existing go-redis client.
+// New creates a cache adapter from an existing go-redis client.
 //
 // The caller owns the client configuration. Close closes the provided client.
-func NewRedis(client RedisClient) (*Redis, error) {
+func New(client Client) (*Redis, error) {
 	if client == nil {
 		return nil, ErrInvalidRedisConfig
 	}
 	return &Redis{client: client}, nil
 }
 
-// NewRedisFromOptions creates a Redis cache adapter from standalone client options.
-func NewRedisFromOptions(options *redis.Options) (*Redis, error) {
+// NewFromOptions creates a Redis cache adapter from standalone client options.
+func NewFromOptions(options *goredis.Options) (*Redis, error) {
 	if options == nil {
 		return nil, ErrInvalidRedisConfig
 	}
 	cloned := *options
-	return NewRedis(redis.NewClient(&cloned))
+	return New(goredis.NewClient(&cloned))
 }
 
-// NewRedisFromClusterOptions creates a Redis cache adapter from cluster client options.
-func NewRedisFromClusterOptions(options *redis.ClusterOptions) (*Redis, error) {
+// NewFromClusterOptions creates a Redis cache adapter from cluster client options.
+func NewFromClusterOptions(options *goredis.ClusterOptions) (*Redis, error) {
 	if options == nil {
 		return nil, ErrInvalidRedisConfig
 	}
 	cloned := *options
-	return NewRedis(redis.NewClusterClient(&cloned))
+	return New(goredis.NewClusterClient(&cloned))
 }
 
-// NewRedisFromURL creates a Redis cache adapter from a redis:// or rediss:// URL.
-func NewRedisFromURL(rawURL string) (*Redis, error) {
+// NewFromURL creates a Redis cache adapter from a redis:// or rediss:// URL.
+func NewFromURL(rawURL string) (*Redis, error) {
 	if rawURL == "" {
 		return nil, ErrInvalidRedisConfig
 	}
-	options, err := redis.ParseURL(rawURL)
+	options, err := goredis.ParseURL(rawURL)
 	if err != nil {
 		return nil, ErrInvalidRedisConfig
 	}
-	return NewRedisFromOptions(options)
+	return NewFromOptions(options)
 }
 
 // Get returns a cache value.
@@ -83,7 +92,7 @@ func (cache *Redis) Get(ctx context.Context, key string) ([]byte, bool, error) {
 		return nil, false, ErrInvalidRedisConfig
 	}
 	value, err := cmd.Bytes()
-	if errors.Is(err, redis.Nil) {
+	if errors.Is(err, goredis.Nil) {
 		return nil, false, nil
 	}
 	if err != nil {
@@ -135,7 +144,7 @@ func (cache *Redis) Ping(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	pinger, ok := client.(RedisPinger)
+	pinger, ok := client.(Pinger)
 	if !ok {
 		return ErrInvalidRedisConfig
 	}
@@ -156,9 +165,18 @@ func (cache *Redis) Close() error {
 	return client.Close()
 }
 
-func (cache *Redis) redisClient() (RedisClient, error) {
+func (cache *Redis) redisClient() (Client, error) {
 	if cache == nil || cache.client == nil {
 		return nil, ErrInvalidRedisConfig
 	}
 	return cache.client, nil
+}
+
+func cloneBytes(value []byte) []byte {
+	if value == nil {
+		return nil
+	}
+	cloned := make([]byte, len(value))
+	copy(cloned, value)
+	return cloned
 }

@@ -1,4 +1,4 @@
-package cache
+package redis
 
 import (
 	"context"
@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
+	corecache "github.com/DarkInno/saas/cache"
 	tenantctx "github.com/DarkInno/saas/core/context"
 	"github.com/DarkInno/saas/core/types"
-	redis "github.com/redis/go-redis/v9"
+	goredis "github.com/redis/go-redis/v9"
 )
 
 func TestRedisCacheIntegration(t *testing.T) {
@@ -28,7 +29,7 @@ func TestRedisCacheIntegration(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	client := redis.NewClient(&redis.Options{
+	client := goredis.NewClient(&goredis.Options{
 		Addr:     addr,
 		Password: os.Getenv("SAAS_REDIS_PASSWORD"),
 		DB:       db,
@@ -37,7 +38,7 @@ func TestRedisCacheIntegration(t *testing.T) {
 		t.Fatalf("Ping() error = %v", err)
 	}
 
-	base, err := NewRedis(client)
+	base, err := New(client)
 	if err != nil {
 		t.Fatalf("NewRedis() error = %v", err)
 	}
@@ -51,7 +52,7 @@ func TestRedisCacheIntegration(t *testing.T) {
 	})
 
 	suffix := strconv.FormatInt(time.Now().UnixNano(), 36)
-	scoped := NewTenantCache(base)
+	scoped := corecache.NewTenantCache(base)
 	ctxA := tenantctx.WithTenant(ctx, types.Tenant{ID: types.TenantID("redis-a-" + suffix)})
 	ctxB := tenantctx.WithTenant(ctx, types.Tenant{ID: types.TenantID("redis-b-" + suffix)})
 	t.Cleanup(func() {

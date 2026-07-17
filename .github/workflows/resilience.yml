@@ -9,8 +9,25 @@ permissions:
   contents: read
 
 jobs:
-  fuzz:
-    name: native fuzz
+  fuzz-core:
+    name: core fuzz (Go 1.22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.22.x"
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
+      - run: go test ./data/sqlx -run=^$ -fuzz=FuzzQueryWithArgs -fuzztime=30s
+      - run: go test ./core/types -run=^$ -fuzz=FuzzParseTenantID -fuzztime=30s
+      - run: go test ./core/resolver -run=^$ -fuzz=FuzzCompositeResolverPriority -fuzztime=30s
+      - run: go test ./cache -run=^$ -fuzz=FuzzKeyBuilder -fuzztime=30s
+
+  fuzz-redis:
+    name: Redis adapter fuzz (Go 1.24)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -18,10 +35,12 @@ jobs:
         with:
           go-version: "1.24.x"
           cache: true
-      - run: go test ./data/sqlx -run=^$ -fuzz=FuzzQueryWithArgs -fuzztime=30s
-      - run: go test ./core/types -run=^$ -fuzz=FuzzParseTenantID -fuzztime=30s
-      - run: go test ./core/resolver -run=^$ -fuzz=FuzzCompositeResolverPriority -fuzztime=30s
-      - run: go test ./cache -run=^$ -fuzz=FuzzRedisURLAndKeyBuilder -fuzztime=30s
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
+      - name: Fuzz Redis URL parsing and secret redaction
+        working-directory: cache/redis
+        run: go test ./... -run=^$ -fuzz=FuzzNewFromURL -fuzztime=30s
 
   chaos:
     name: deterministic dependency chaos
@@ -32,6 +51,9 @@ jobs:
         with:
           go-version: "1.24.x"
           cache: true
+          cache-dependency-path: |
+            go.sum
+            **/go.sum
       - name: Run chaos contracts
         shell: pwsh
         run: ./tests/run-chaos.ps1

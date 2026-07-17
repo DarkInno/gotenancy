@@ -160,7 +160,7 @@ func (notifier *WebhookNotifier) Send(ctx context.Context, message Message) erro
 	}
 	response, err := notifier.client.Do(request)
 	if err != nil {
-		return err
+		return normalizeHTTPError(ctx, err)
 	}
 	defer func() {
 		_ = response.Body.Close()

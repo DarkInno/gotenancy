@@ -14,12 +14,13 @@ It provides tenant context and resolution, data guards, web/RPC middleware, tena
 
 - **Only** shared-database, shared-schema isolation: tenant-owned rows use the same tables and require a `tenant_id` boundary.
 - Host-wide access only through explicit host context.
-- GORM, Ent, and sqlx adapters for tenant-aware data access.
-- HTTP, Gin, Echo, Fiber, Kratos, and gRPC middleware.
+- Built-in sqlx helpers plus optional GORM and Ent adapters for tenant-aware data access.
+- Built-in HTTP middleware plus optional Gin, Echo, Fiber, Kratos, and gRPC integrations.
 - Tenant lifecycle, plans, subscriptions, quotas, features, post-auth identity links, RBAC, audit, users, and notifications.
 
 SaaS does not implement database-per-tenant, schema-per-tenant, or hybrid isolation. It does not provision tenant databases or schemas, route tenant connections, or switch schemas at runtime. Applications that need those models must provide that layer separately or use a different isolation solution.
-Future optional extension capabilities can live in separate modules, but the core adoption adapters ship with the main module.
+Optional integrations are separate Go modules, so the core toolkit does not pull
+in framework, ORM, Redis, OIDC, OpenTelemetry, or provider-SDK dependencies.
 
 ## Architecture
 
@@ -35,18 +36,32 @@ before upgrading an existing application.
 
 ## Requirements
 
-- Go `1.24+`.
+- Go `1.22+` for the root module.
+- Optional integrations have their own minimum Go versions; Redis and OIDC
+  require Go `1.24+`.
+
+See [docs/modules.md](docs/modules.md) for the complete compatibility matrix.
 
 ## Install
 
 ```bash
+# Core toolkit only (Go 1.22+).
 go mod init your-app
-go get github.com/DarkInno/saas
+go get github.com/DarkInno/saas@v0.3.0
+
+# Add only the integration your application uses; this example adds GORM.
+go get github.com/DarkInno/saas/data/gorm@v0.3.0
 ```
+
+The root module does not download optional adapters. See
+[docs/modules.md](docs/modules.md) for every installable module and its Go
+version requirement.
 
 ## Complete Example
 
-This copy-paste example creates an in-memory tenant, installs the GORM plugin, runs a tenant-scoped query in GORM DryRun mode, and prints the generated SQL. It does not require a live database.
+This copy-paste example uses the optional GORM module. It creates an in-memory
+tenant, installs the GORM plugin, runs a tenant-scoped query in GORM DryRun
+mode, and prints the generated SQL. It does not require a live database.
 
 ```go
 package main
@@ -116,13 +131,13 @@ func main() {
 
 ## Adoption Examples
 
-Run the examples from the repository root:
+Run the examples from the repository root. Each example owns a small Go module:
 
 ```bash
-go run ./examples/quickstart
-go run ./examples/gin-gorm
-go run ./examples/grpc
-go run ./examples/ent
+go -C examples/quickstart run .
+go -C examples/gin-gorm run .
+go -C examples/grpc run .
+go -C examples/ent run .
 ```
 
 - [examples/quickstart](examples/quickstart): minimal GORM create flow.
@@ -186,8 +201,8 @@ ctx := tenantctx.WithHost(context.Background())
 - `core/resolver`: header, cookie, query, domain, token-claim, and composite resolvers.
 - `core/store`: memory store, paginated list filters, memory cache, cached store decorator, and `database/sql` store.
 - `data`: ORM-independent tenant filter condition.
-- `data/gorm`: GORM plugin, guard suite, host-only `SafeRaw`/`SafeExec`, `BulkCreate`, and delete APIs.
-- `data/ent`: Ent selector predicate, query filter, mutation filter, and hook APIs.
+- `data/gorm`: optional Go 1.22 GORM plugin, guard suite, host-only `SafeRaw`/`SafeExec`, `BulkCreate`, and delete APIs.
+- `data/ent`: optional Go 1.23 Ent selector predicate, query filter, mutation filter, and hook APIs.
 - `data/sqlx`: tenant-filtered APIs for simple single-table SELECT/UPDATE/DELETE statements.
 - `tenant`: tenant lifecycle state machine.
 - `plan`: plan Store, memory implementation, and `database/sql` SQLStore.
@@ -196,17 +211,17 @@ ctx := tenantctx.WithHost(context.Background())
 - `feature`: plan defaults, tenant-level feature overrides, memory implementation, and `database/sql` SQLStore.
 - `onboarding`: tenant onboarding flow across tenant, plan, subscription, feature, quota, audit, and notification services.
 - `biz/identity`: post-auth tenant user mapping for verified external identity assertions, with memory and `database/sql` stores.
-- `biz/identity/oidc`: OIDC authorization-code bridge with PKCE, state, nonce, ID-token verification, one-time login state storage, SQL-backed login state storage, and assertion output.
-- `web/*`: tenant middleware and guards for net/http, Gin, Echo, Fiber, and Kratos.
-- `rpc/grpc`: gRPC unary and stream tenant interceptors.
+- `biz/identity/oidc`: optional Go 1.24 OIDC authorization-code bridge with PKCE, state, nonce, ID-token verification, one-time login state storage, SQL-backed login state storage, and assertion output.
+- `web/http`: core tenant middleware and guards for `net/http`; Gin, Echo, Fiber, and Kratos are optional modules.
+- `rpc/grpc`: optional Go 1.23 gRPC unary and stream tenant interceptors.
 - `migration`: tenant column and index planning.
-- `cache`: tenant-scoped cache wrapper, memory adapters, and Redis adapter.
-- `obs`: tenant observability fields, redaction, `slog` helpers, and OpenTelemetry API helpers.
-- `biz/*`: identity, user, RBAC, audit, and notification modules with memory stores, SQL stores where persistence is part of the module contract, SMTP/SES/Resend/webhook delivery, channel routing, fanout, retry, and timeout helpers.
+- `cache`: core tenant-scoped cache wrapper and memory adapters; `cache/redis` is an optional Go 1.24 adapter.
+- `obs`: core tenant observability fields, redaction, and `slog` helpers; `obs/otel` is an optional Go 1.23 module.
+- `biz/*`: identity, user, RBAC, audit, and notification modules with memory stores, SQL stores where persistence is part of the module contract, SMTP/Resend/webhook delivery, channel routing, fanout, retry, and timeout helpers. SES is optional.
 
 ## Post-Auth Identity Mapping
 
-`biz/identity` maps verified external identities into tenant users and memberships. `biz/identity/oidc` adds a standard OIDC authorization-code bridge for callback processing, one-time login state, and ID-token verification. It is still not a full IAM platform: application sessions, account screens, Magic Link delivery, SAML validation, MFA, and WebAuthn remain application or IdP responsibilities.
+`biz/identity` maps verified external identities into tenant users and memberships. The optional Go 1.24 `biz/identity/oidc` module adds a standard OIDC authorization-code bridge for callback processing, one-time login state, and ID-token verification. It is still not a full IAM platform: application sessions, account screens, Magic Link delivery, SAML validation, MFA, and WebAuthn remain application or IdP responsibilities.
 
 ```go
 oidcClient, err := oidc.New(ctx, oidc.Config{
@@ -232,10 +247,17 @@ Redirect the browser to `login.URL`. `MemoryLoginStore` is process-local and con
 ## Verification
 
 ```bash
+# Core module (Go 1.22+).
 go test ./...
 go vet ./...
 go test -race ./...
+
+# Run an optional module only when your application uses it.
+go -C cache/redis test ./...
 ```
+
+The CI workflow runs every published optional module with its minimum supported
+Go version; see [docs/modules.md](docs/modules.md) for the complete matrix.
 
 On Windows, `go test -race` requires cgo and a C compiler. Without local cgo, run race tests in Docker:
 
@@ -253,17 +275,15 @@ The PowerShell runners start a local disposable Docker Compose environment for M
 $sqlProfile = Join-Path $env:TEMP 'saas-sql-contract-coverage.out'
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run-integration.ps1 -CoverageProfile $sqlProfile
 
-$unitProfile = Join-Path $env:TEMP 'saas-unit-coverage.out'
-$profile = Join-Path $env:TEMP 'saas-coverage.out' # merged unit + database profile
-go test -count=1 -covermode=atomic -coverpkg=./... "-coverprofile=$unitProfile" ./...
-./tests/merge-coverage.ps1 -Profiles @($unitProfile, $sqlProfile) -Output $profile
+$profile = Join-Path $env:TEMP 'saas-coverage.out' # merged core + optional + database profiles
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run-coverage.ps1 -Output $profile -IntegrationProfile $sqlProfile
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/check-coverage.ps1 -Profile $profile -Minimum 85
-Remove-Item -LiteralPath $unitProfile, $sqlProfile, $profile, "$profile.txt" -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $sqlProfile, $profile, "$profile.txt" -Force -ErrorAction SilentlyContinue
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run-chaos.ps1
 ```
 
-For production Redis, configure TLS, timeouts, retry limits, and OpenTelemetry on the `go-redis` client before passing it to `cache.NewRedis`.
+For production Redis, configure TLS, timeouts, retry limits, and OpenTelemetry on the `go-redis` client before passing it to `redis.New` from the optional `cache/redis` module.
 
 ## Project Layout
 
@@ -280,7 +300,7 @@ web/           Web framework and net/http integration
 migration/     Tenant schema migration planning
 cache/         Tenant-aware cache abstractions
 rpc/           RPC metadata propagation
-obs/           Observability fields, redaction, slog, and OpenTelemetry helpers
+obs/           Observability fields, redaction, and slog; OpenTelemetry is optional
 biz/           Identity, user, RBAC, audit, and notification modules
 examples/      Runnable examples
 tests/         Security, cache, concurrency, and local-only DB integration tests
@@ -289,7 +309,9 @@ docs/          API, security, and compatibility notes
 
 ## Compatibility
 
-See [docs/compatibility.md](docs/compatibility.md).
+See [docs/modules.md](docs/modules.md) for module installation, Go-version
+requirements, release tags, and migration steps. See
+[docs/compatibility.md](docs/compatibility.md) for broader compatibility notes.
 
 ## License
 
